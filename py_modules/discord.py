@@ -68,6 +68,7 @@ class ApiClient:
 
 class RpcClient:
     def __init__(self, token) -> None:
+        self.running = True
         self.token = token
         self.ws : client.WebSocketClientProtocol = None
         self.api : ApiClient = None
@@ -87,7 +88,7 @@ class RpcClient:
         self.vc_channel_name = ""
         self.vc_guild_name = ""
 
-        self.loop.create_task(self.print_status())
+        #self.loop.create_task(self.print_status())
     
     async def _process_event(self, data):
         callback = None
@@ -114,7 +115,7 @@ class RpcClient:
         await self.ws.send(dumps({
             "cmd":"OVERLAY","args":{"type":"CONNECT","pid":-1,"token":self.token}, "nonce": str(uuid4())
         }))
-        while True:
+        while self.running:
             data = loads(await self.ws.recv())
             if data["cmd"] == "DISPATCH" and data["evt"] == "OVERLAY" and data["data"]["type"] == "DISPATCH":
                 payloads = data["data"]["payloads"]
@@ -203,6 +204,9 @@ class RpcClient:
         await self.ws.send(dumps({
             "cmd":"OVERLAY","args":{"type":"DISPATCH","pid":-1,"token":self.token,"payloads":[{"type":"VOICE_CHANNEL_SELECT","guildId":None,"channelId":None,"currentVoiceChannelId":self.vc_channel_id,"video":False,"stream":False}]},"nonce": str(uuid4())
         }))
+
+    async def stop(self):
+        return await self.ws.close()
     
     def run(self):
         self.loop.run_until_complete(self._main())
