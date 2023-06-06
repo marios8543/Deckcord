@@ -1,105 +1,76 @@
 import {
-  ButtonItem,
-  definePlugin,
   DialogButton,
-  Menu,
-  MenuItem,
+  definePlugin,
   PanelSection,
   PanelSectionRow,
-  Router,
   ServerAPI,
-  showContextMenu,
   staticClasses,
 } from "decky-frontend-lib";
-import { VFC } from "react";
-import { FaShip } from "react-icons/fa";
+import { VFC, useState } from "react";
+import {
+  FaDiscord,
+  FaMicrophoneAltSlash,
+  FaMicrophoneAlt,
+  FaHeadphonesAlt,
+  FaVolumeMute,
+  FaPhoneSlash,
+} from "react-icons/fa";
 
-import logo from "../assets/logo.png";
 
-// interface AddMethodArgs {
-//   left: number;
-//   right: number;
-// }
+const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
+  const [state, setState] = useState<any | undefined>();
 
-const Content: VFC<{ serverAPI: ServerAPI }> = ({}) => {
-  // const [result, setResult] = useState<number | undefined>();
+  function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 
-  // const onClick = async () => {
-  //   const result = await serverAPI.callPluginMethod<AddMethodArgs, number>(
-  //     "add",
-  //     {
-  //       left: 2,
-  //       right: 2,
-  //     }
-  //   );
-  //   if (result.success) {
-  //     setResult(result.result);
-  //   }
-  // };
+  (async function () {
+    while (true) {
+      setState((await serverAPI.callPluginMethod("get_state", {})).result);
+      await sleep(1000);
+    }
+  })();
 
   return (
-    <PanelSection title="Panel Section">
+    <PanelSection>
       <PanelSectionRow>
-        <ButtonItem
-          layout="below"
-          onClick={(e) =>
-            showContextMenu(
-              <Menu label="Menu" cancelText="CAAAANCEL" onCancel={() => {}}>
-                <MenuItem onSelected={() => {}}>Item #1</MenuItem>
-                <MenuItem onSelected={() => {}}>Item #2</MenuItem>
-                <MenuItem onSelected={() => {}}>Item #3</MenuItem>
-              </Menu>,
-              e.currentTarget ?? window
-            )
-          }
-        >
-          Server says yolo
-        </ButtonItem>
-      </PanelSectionRow>
-
-      <PanelSectionRow>
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <img src={logo} />
+        <div style={{ display: "flex", justifyContent: "left" }}>
+          <img src={'https://cdn.discordapp.com/avatars/' + state?.me?.id + '/' + state?.me?.avatar + '.webp'} />
+          {state?.me?.username}
         </div>
       </PanelSectionRow>
-
+      <hr></hr>
       <PanelSectionRow>
-        <ButtonItem
-          layout="below"
-          onClick={() => {
-            Router.CloseSideMenus();
-            Router.Navigate("/decky-plugin-test");
-          }}
-        >
-          Router
-        </ButtonItem>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          if (state?.me?.is_muted) {
+            <DialogButton
+              style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px', marginRight: '10px' }}
+            ><FaMicrophoneAltSlash /></DialogButton>
+          }
+          else {
+            <DialogButton
+              style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px', marginRight: '10px' }}
+            ><FaMicrophoneAlt /></DialogButton>
+          }
+          <DialogButton
+            style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px', marginRight: '10px' }}
+          ><FaHeadphonesAlt /></DialogButton>
+          <DialogButton
+            style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px' }}
+          ><FaPhoneSlash /></DialogButton>
+        </div>
       </PanelSectionRow>
     </PanelSection>
   );
 };
 
-const DeckyPluginRouterTest: VFC = () => {
-  return (
-    <div style={{ marginTop: "50px", color: "white" }}>
-      Hello World!
-      <DialogButton onClick={() => Router.NavigateToLibraryTab()}>
-        Go to Library
-      </DialogButton>
-    </div>
-  );
-};
 
 export default definePlugin((serverApi: ServerAPI) => {
-  serverApi.routerHook.addRoute("/decky-plugin-test", DeckyPluginRouterTest, {
-    exact: true,
-  });
-
   return {
-    title: <div className={staticClasses.Title}>Example Plugin</div>,
+    title: <div className={staticClasses.Title}>Deckcord</div>,
     content: <Content serverAPI={serverApi} />,
-    icon: <FaShip />,
+    icon: <FaDiscord />,
     onDismount() {
-      serverApi.routerHook.removeRoute("/decky-plugin-test");
     },
   };
 });

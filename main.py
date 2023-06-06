@@ -2,7 +2,7 @@
 from aiohttp.web import Application, post, _run_app, Response
 from asyncio import get_event_loop, run
 from json import dumps
-from py_modules import discord
+from . import rpc
 import aiohttp_cors
 
 class Plugin:
@@ -14,7 +14,7 @@ class Plugin:
             allow_credentials=True
         )
     })
-    rpc: discord.RpcClient = None
+    rpc: rpc.RpcClient = None
     overlay_url = ""
     rpc_token = ""
 
@@ -28,7 +28,7 @@ class Plugin:
             if self.rpc:
 #                decky_plugin.logger.info("Stopping old RPC Client")
                 await self.rpc.stop()
-            self.rpc = discord.RpcClient(self.rpc_token)
+            self.rpc = rpc.RpcClient(self.rpc_token)
             get_event_loop().create_task(self.rpc._main())
         return Response(status=200, body="OK")
 
