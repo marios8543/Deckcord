@@ -35,7 +35,7 @@ class User:
         }
     
     def __str__(self) -> str:
-        return f"{self.name}{'#'+self.discriminator if self.discriminator > 0 else ''}"
+        return f"{self.name}{'#'+self.discriminator if self.discriminator and self.discriminator != '0' else ''}"
 
 class Response:
     def __init__(self) -> None:

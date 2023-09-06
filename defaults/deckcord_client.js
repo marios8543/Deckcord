@@ -2,8 +2,8 @@
     function buildReadyObject() {
         return {
             user: Vencord.Webpack.Common.UserStore.getCurrentUser(),
-            mute: document.querySelector('[aria-label="Mute"]').ariaChecked==="true",
-            deaf: document.querySelector('[aria-label="Deafen"]').ariaChecked==="true"
+            mute: Vencord.Webpack.findStore("MediaEngineStore").isSelfMute(),
+            deaf: Vencord.Webpack.findStore("MediaEngineStore").isSelfDeaf()
         }
     }
     function patchTypingField() {
@@ -75,11 +75,12 @@
                 if (e.type == "CHANNEL_SELECT") patchTypingField();
                 ws.send(JSON.stringify(e));
             });
+            Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().enabled = true;
             clearInterval(t);
         }
         catch (err) { }
     }, 100);
-    const tt = setInterval(() => {
+    /* const tt = setInterval(() => {
         try {
             document.querySelector("#app-mount > div.appAsidePanelWrapper-ev4hlp > div.notAppAsidePanel-3yzkgB > div.app-3xd6d0 > div > div.layers-OrUESM.layers-1YQhyW > div > div > div > div > main > section > div > div.toolbar-3_r2xA > a").onclick = e => {
                 e.preventDefault();
@@ -88,5 +89,5 @@
             clearInterval(tt);
         }
         catch (err) {}
-    }, 100);
+    }, 100); */
 })();
