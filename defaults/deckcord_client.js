@@ -1,17 +1,28 @@
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 (function () {
-    function buildReadyObject() {
-        return {
-            user: Vencord.Webpack.Common.UserStore.getCurrentUser(),
-            mute: Vencord.Webpack.findStore("MediaEngineStore").isSelfMute(),
-            deaf: Vencord.Webpack.findStore("MediaEngineStore").isSelfDeaf()
+    async function buildReadyObject() {
+        while (true) {
+            const user = Vencord.Webpack.Common.UserStore.getCurrentUser();
+            if (user == undefined) {
+                await sleep(100);
+                continue
+            }
+            return {
+                user: user,
+                mute: Vencord.Webpack.findStore("MediaEngineStore").isSelfMute(),
+                deaf: Vencord.Webpack.findStore("MediaEngineStore").isSelfDeaf()
+            }
         }
     }
     function patchTypingField() {
         const t = setInterval(() => {
             try {
-                document.getElementsByClassName("editor-H2NA06")[0].onclick = (e) => fetch("http://127.0.0.1:65123/openkb", {mode: "no-cors"});
+                document.getElementsByClassName("editor-H2NA06")[0].onclick = (e) => fetch("http://127.0.0.1:65123/openkb", { mode: "no-cors" });
                 clearInterval(t);
-            } catch (err) {}
+            } catch (err) { }
         }, 100)
     }
     var ws;
@@ -32,6 +43,17 @@
                     case "$getguild":
                         result = Vencord.Webpack.Common.GuildStore.getGuild(data.id);
                         break;
+                    case "$getmedia":
+                        result = {
+                            mute: Vencord.Webpack.findStore("MediaEngineStore").isSelfMute(),
+                            deaf: Vencord.Webpack.findStore("MediaEngineStore").isSelfDeaf()
+                        }
+                        break;
+                    case "$ptt":
+                        try {
+                            Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().connections.values().next().value.setForceAudioInput(data.value);
+                        } catch (error) {}
+                        return;
                 }
                 const payload = {
                     type: "$deckcord_request",
@@ -51,16 +73,19 @@
             }, 500);
         };
 
-        ws.onopen = function(ev) {
-            const t = setInterval(() => {
+        ws.onopen = async function (ev) {
+            while (true) {
                 try {
+                    const payload = await buildReadyObject();
                     ws.send(JSON.stringify({
                         type: "READY",
-                        result: buildReadyObject()
+                        result: payload
                     }));
-                    clearInterval(t);
-                } catch (error) {}
-            });
+                    console.log("SENT READY PAYLOAD", payload)
+                    break;
+                } catch (error) { }
+                await sleep(100);
+            }
         }
 
         ws.onerror = function (err) {
@@ -76,18 +101,10 @@
                 ws.send(JSON.stringify(e));
             });
             Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().enabled = true;
+            Vencord.Webpack.Common.FluxDispatcher.dispatch({type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true})
+            console.log("MEDIA ENGINE ENABLED");
             clearInterval(t);
         }
         catch (err) { }
     }, 100);
-    /* const tt = setInterval(() => {
-        try {
-            document.querySelector("#app-mount > div.appAsidePanelWrapper-ev4hlp > div.notAppAsidePanel-3yzkgB > div.app-3xd6d0 > div > div.layers-OrUESM.layers-1YQhyW > div > div > div > div > main > section > div > div.toolbar-3_r2xA > a").onclick = e => {
-                e.preventDefault();
-                fetch("http://127.0.0.1:65123/close", {mode: "no-cors"});
-            }
-            clearInterval(tt);
-        }
-        catch (err) {}
-    }, 100); */
 })();

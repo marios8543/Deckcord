@@ -1,21 +1,25 @@
 from json import dumps, loads
-from asyncio import sleep, get_event_loop, Task
+from asyncio import sleep, get_event_loop, Task, Event, Queue
 from aiohttp import WSMsgType
 from aiohttp.web import WebSocketResponse
 from traceback import print_exception
 
 from .store_access import StoreAccess, User
+from decky_plugin import logger
 
 class EventHandler:
     def __init__(self) -> None:
         self.ws: WebSocketResponse
         self.api = StoreAccess()
+        self.state_changed_event = Event()
+        self.notification_queue = Queue()
         self.event_handlers = {
             "READY": self._ready,
             "VOICE_STATE_UPDATES": self._voice_state_update,
             "VOICE_CHANNEL_SELECT": self._voice_channel_select,
             "AUDIO_TOGGLE_SELF_MUTE": self.toggle_mute,
-            "AUDIO_TOGGLE_SELF_DEAF": self.toggle_deafen
+            "AUDIO_TOGGLE_SELF_DEAF": self.toggle_deafen,
+            "RPC_NOTIFICATION_CREATE": self._notification_create
         }
 
         self.me = User({"id": "", "username": "", "discriminator": None, "avatar": ""})
@@ -31,26 +35,34 @@ class EventHandler:
             return
         if data["type"] in self.event_handlers:
             callback = self.event_handlers[data["type"]]
+            logger.info(f"Handling event: {data['type']}")
             #print(dumps(data, indent=2)+"\n\n")
         else:
             return
         def _(future: Task):
+            self.state_changed_event.set()
             e = future.exception()
             if e:
                 print(f"Exception during handling of {data['type']} event.   {e}")
                 print_exception(e)
         get_event_loop().create_task(callback(data)).add_done_callback(_)
     
-    async def print_status(self):
+    async def yield_new_state(self):
         old_dict = {}
         while True:
+            await self.state_changed_event.wait()
             dc = self.build_state_dict()
             if old_dict != dc:
-                print(dumps(dc, indent=2)+"\n\n")
+                yield dc
                 old_dict = dc
-            await sleep(0.1)
+            self.state_changed_event.clear()
+    
+    async def yield_notification(self):
+        while True:
+            yield await self.notification_queue.get()
 
     async def main(self, ws):
+        logger.info("Received WS Connection. Starting event processing loop")
         self.ws = ws
         self.api.ws = ws
         async for msg in self.ws:
@@ -60,6 +72,7 @@ class EventHandler:
                 print('ws connection closed with exception %s' % self.ws.exception())
 
     async def _ready(self, data):
+        logger.info(f"Received ready event. {dumps(data)}")
         self.me = User(data["result"]["user"])
         self.me.is_muted = data["result"]["mute"]
         self.me.is_deafened = data["result"]["deaf"]
@@ -86,10 +99,15 @@ class EventHandler:
                 user_to_add = self.me
             else:
                 user_to_add = User.from_vc(state)
+                if state["channelId"] == self.vc_channel_id:
+                    await user_to_add.populate(self.api)
             if state["channelId"] in self.voicestates:
                 self.voicestates[state["channelId"]][state["userId"]] = user_to_add
             else:
                 self.voicestates[state["channelId"]] = {state["userId"]: user_to_add}
+    
+    async def _notification_create(self, data):
+        await self.notification_queue.put(data)
 
     def build_state_dict(self):
         r = {
@@ -108,12 +126,16 @@ class EventHandler:
     async def toggle_mute(self, *args, act=False):
         if act:
             await self.ws.send_json({"type": 'AUDIO_TOGGLE_SELF_MUTE', "context": 'default', "syncRemote": True})
-        self.me.is_muted = not self.me.is_muted
+        r = await self.api.get_media()
+        self.me.is_muted = r["mute"]
+        self.me.is_deafened = r["deaf"]
     
     async def toggle_deafen(self, *args, act=False):
         if act:
             await self.ws.send_json({"type": 'AUDIO_TOGGLE_SELF_DEAF', "context": 'default', "syncRemote": True})
-        self.me.is_deafened = not self.me.is_deafened
+        r = await self.api.get_media()
+        self.me.is_muted = r["mute"]
+        self.me.is_deafened = r["deaf"]
     
     async def disconnect_vc(self):
         await self.ws.send_json({"type":"VOICE_CHANNEL_SELECT","guildId":None,"channelId":None,"currentVoiceChannelId":self.vc_channel_id,"video":False,"stream":False})

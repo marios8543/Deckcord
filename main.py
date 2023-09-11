@@ -1,23 +1,29 @@
-#import decky_plugin
-from aiohttp.web import Application, get, _run_app, WebSocketResponse, json_response, StreamResponse, route
+from aiohttp.web import Application, get, WebSocketResponse, json_response, StreamResponse, route, AppRunner, TCPSite
 from aiohttp import ClientSession
-from asyncio import run, sleep, ensure_future, create_task
+from asyncio import sleep, ensure_future, create_task
 import aiohttp_cors
 from ssl import create_default_context
-from certifi import where
 from io import BytesIO
 from traceback import format_exc
+from json import dumps
 
-from py_modules.tab_utils.tab import create_discord_tab,  \
+import os, sys
+sys.path.append(os.path.dirname(__file__))
+
+from tab_utils.tab import create_discord_tab,  \
                           setup_discord_tab,              \
                           boot_discord,                   \
                           setOSK,                         \
                           set_discord_tab_visibility,      \
                           inject_client_to_discord_tab
-from py_modules.discord_client.event_handler import EventHandler
-from py_modules.proxy import process_fetch
+from tab_utils.cdp import get_tab, get_tab_lambda
+from discord_client.event_handler import EventHandler
+from proxy import process_fetch
 
-SSL_CTX = create_default_context(cafile=where())
+from decky_plugin import logger
+logger.setLevel(10)
+
+SSL_CTX = create_default_context(cafile="/home/deck/.local/lib/python3.10/site-packages/certifi/cacert.pem")
 
 class Plugin:
     server = Application()
@@ -30,61 +36,104 @@ class Plugin:
     })
     evt_handler = EventHandler()
 
-    async def _main(self):
+    async def initialize():
         await create_discord_tab()
-        await sleep(1)
-        tab = await setup_discord_tab()
-        create_task(process_fetch(tab))
+        while True:
+            try:
+                tab = await setup_discord_tab()
+                create_task(process_fetch(tab))
+                break
+            except:
+                await sleep(0.1)
+        while True:
+            try:
+                await boot_discord()
+                break
+            except:
+                await sleep(0.1)
         async def _():
-            await sleep(5)
-            await boot_discord()
-            await sleep(3)
-            await inject_client_to_discord_tab()
+            while True:
+                try:
+                    await inject_client_to_discord_tab()
+                    break
+                except:
+                    await sleep(0.1)
         ensure_future(_())
 
-        self.server.add_routes([
-            get("/close", self._close),
-            get("/open", self._open),
-            get("/openkb", self._openkb),
-            get("/socket", self._websocket_handler),
-            get("/storeget", self._storeget),
-            route("*", '/{tail:.*}', self._proxy)
+    async def _main(self):
+        await Plugin.initialize()
+        Plugin.server.add_routes([
+            get("/close", Plugin._close),
+            get("/open", Plugin._open),
+            get("/openkb", Plugin._openkb),
+            get("/socket", Plugin._websocket_handler),
+            get("/storeget", Plugin._storeget),
+            route("*", '/{tail:.*}', Plugin._proxy)
         ])
-        self.cors.add(list(self.server.router.routes())[0])
-        ensure_future(self.evt_handler.print_status())
-        await _run_app(self.server, host="127.0.0.1", port=65123)
+        Plugin.cors.add(list(Plugin.server.router.routes())[0])
+        Plugin.runner = AppRunner(Plugin.server, access_log=None)
+        await Plugin.runner.setup()
+        logger.info("Starting server!!!")
+        await TCPSite(Plugin.runner, '127.0.0.1', 65123).start()
+        Plugin.shared_js_tab = await get_tab("SharedJSContext")
+        await Plugin.shared_js_tab.open_websocket()
+        create_task(Plugin._frontend_evt_dispatcher())
+        create_task(Plugin._notification_dispatcher())
+        while True:
+            await sleep(3600)
     
-    async def _close(self, request):
-        await set_discord_tab_visibility(False)
+    async def _close(request):
+        await Plugin.shared_js_tab.ensure_open()
+        await set_discord_tab_visibility(Plugin.shared_js_tab, False)
+        logger.info("Setting discord visibility to false")
         return "OK"
     
-    async def _open(self, request):
-        await set_discord_tab_visibility(True)
+    async def _open(request):
+        await Plugin.shared_js_tab.ensure_open()
+        await set_discord_tab_visibility(Plugin.shared_js_tab, True)
         return "OK"
     
-    async def _openkb(self, request):
-        await setOSK(True)
+    async def _openkb(request):
+        await Plugin.shared_js_tab.ensure_open()
+        await setOSK(Plugin.shared_js_tab, True)
+        logger.info("Setting discord visibility to true")
         return "OK"
 
-    async def _websocket_handler(self, request):
+    async def _websocket_handler(request):
+        logger.info("Received websocket connection!")
         ws = WebSocketResponse()
         await ws.prepare(request)
-        await self.evt_handler.main(ws)
+        await Plugin.evt_handler.main(ws)
         return ws
     
-    async def _storeget(self, request):
+    async def _frontend_evt_dispatcher():
+        async for state in Plugin.evt_handler.yield_new_state():
+            async def _():
+                await Plugin.shared_js_tab.ensure_open()
+                Plugin.shared_js_tab.evaluate(f"window.DECKCORD.setState(JSON.parse('{dumps(state)}'));")
+            create_task(_())
+    
+    async def _notification_dispatcher():
+        async for notification in Plugin.evt_handler.yield_notification():
+            payload = dumps({
+                'title': notification['title'],
+                'body': notification['body']
+            })
+            await Plugin.shared_js_tab.ensure_open()
+            await Plugin.shared_js_tab.evaluate(f"DeckyPluginLoader.toaster.toast(JSON.parse('{payload}'));")
+    
+    async def _storeget(request):
         req = request.query.get("type")
         id = request.query.get("id")
         if req == "user":
-            return json_response(await self.evt_handler.api.get_user(id))
+            return json_response(await Plugin.evt_handler.api.get_user(id))
         elif req == "channel":
-            return json_response(await self.evt_handler.api.get_channel(id))
+            return json_response(await Plugin.evt_handler.api.get_channel(id))
         elif req == "guild":
-            return json_response(await self.evt_handler.api.get_guild(id))
+            return json_response(await Plugin.evt_handler.api.get_guild(id))
         
-    async def _proxy(self, request):
+    async def _proxy(request):
         try:
-            #print("got request %s", request.rel_url)
             req_headers = { k: v for k, v in request.headers.items()}
             req_headers.update({
                 "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
@@ -115,21 +164,34 @@ class Plugin:
         await res.write(b)
         return res
     
-    async def get_state(self):
-        d = self.rpc.build_state_dict()
-        return d
+    async def get_state(*args):
+        s = Plugin.evt_handler.build_state_dict()
+        #logger.info("STATE", s)
+        return s
     
-    async def toggle_mute(self):
-        return await self.rpc.toggle_mute(act=True)
+    async def toggle_mute(*args):
+        logger.info("Toggling mute")
+        return await Plugin.evt_handler.toggle_mute(act=True)
     
-    async def toggle_deafen(self):
-        return await self.rpc.toggle_deafen(act=True)
+    async def toggle_deafen(*args):
+        logger.info("Toggling deafen")
+        return await Plugin.evt_handler.toggle_deafen(act=True)
     
-    async def disconnect_vc(self):
-        return await self.rpc.disconnect_vc()
+    async def disconnect_vc(*args):
+        logger.info("Disconnecting vc")
+        return await Plugin.evt_handler.disconnect_vc()
+    
+    async def open_discord(*args):
+        logger.info("Setting discord visibility to true")
+        await set_discord_tab_visibility(Plugin.shared_js_tab, True)
+    
+    async def close_discord(*args):
+        logger.info("Setting discord visibility to false")
+        await set_discord_tab_visibility(Plugin.shared_js_tab, False)
 
-    async def _unload(self):
-        await self.rpc.stop()
+    async def set_ptt(plugin, value):
+        await Plugin.evt_handler.ws.send_json({"type": "$ptt", "value": value})
 
-if __name__ == "__main__":
-    run(Plugin()._main())
+    async def _unload(*args):
+        if hasattr(Plugin, "runner"):
+            await Plugin.runner.cleanup()
