@@ -18,14 +18,14 @@ async def create_discord_tab():
                     window.DISCORD_TAB = undefined;
                 }
                 window.DISCORD_TAB = window.DFL.Router.WindowStore.GamepadUIMainWindowInstance.CreateBrowserView("discord");
-                window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 530);
+                window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 495);
                 window.DISCORD_TAB.m_browserView.LoadURL("https://steamloopback.host/discord/init");
                        
                 DFL.Router.WindowStore.GamepadUIMainWindowInstance.m_VirtualKeyboardManager.IsShowingVirtualKeyboard.m_callbacks.m_vecCallbacks.push((e) => {
                     if (!e) {
                         const bounds = window.DISCORD_TAB.m_browserView.GetBounds();
-                        if (bounds.height != 530) {
-                            window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 530);
+                        if (bounds.height != 495) {
+                            window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 495);
                         }
                     }
                 });
@@ -95,7 +95,7 @@ async def setOSK(tab: Tab, state):
         await tab.evaluate("window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 295)")
     else:
         await tab.evaluate("DISCORD_TAB.m_virtualKeyboardHost.m_hideKeyboard()")
-        await tab.evaluate("window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 530)")
+        await tab.evaluate("window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 495)")
     await tab.close_websocket()
 
 async def set_discord_tab_visibility(tab: Tab, visibility):

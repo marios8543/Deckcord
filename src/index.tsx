@@ -17,6 +17,8 @@ import {
   FaSlash,
   FaPlug
 } from "react-icons/fa";
+import { patchMenu } from "./menuPatch";
+import { DiscordTab } from "./DiscordTab";
 
 class _EventTarget extends EventTarget { }
 class DeckcordEvent extends Event {
@@ -125,19 +127,6 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
           ><FaPlug /></DialogButton>
         </div>
       </PanelSectionRow>
-      <PanelSectionRow>
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <DialogButton onClick={() => {
-            serverAPI.callPluginMethod("open_discord", {});
-            Router.CloseSideMenus();
-          }
-          }>Open</DialogButton>
-          <DialogButton onClick={() => {
-            serverAPI.callPluginMethod("close_discord", {});
-          }
-          }>Close</DialogButton>
-        </div>
-      </PanelSectionRow>
       <hr></hr>
       <PanelSectionRow>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -160,11 +149,16 @@ export default definePlugin((serverApi: ServerAPI) => {
   window.DECKCORD = {
     setState: (s: any) => evtTarget.dispatchEvent(new DeckcordEvent(s))
   };
+  const unpatchMenu = patchMenu();
+  serverApi.routerHook.addRoute("/discord", () => {
+    return <DiscordTab serverAPI={serverApi}></DiscordTab>
+  });
   return {
     title: <div className={staticClasses.Title}>Deckcord</div>,
     content: <Content serverAPI={serverApi} evtTarget={evtTarget} />,
     icon: <FaDiscord />,
     onDismount() {
+      unpatchMenu();
     },
   };
 });
