@@ -52,8 +52,19 @@ function sleep(ms) {
                     case "$ptt":
                         try {
                             Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().connections.values().next().value.setForceAudioInput(data.value);
-                        } catch (error) {}
+                        } catch (error) { }
                         return;
+                    case "$rpc":
+                        Vencord.Webpack.Common.FluxDispatcher.dispatch({
+                            type: "LOCAL_ACTIVITY_UPDATE",
+                            activity: data.game ? {
+                                "application_id": "0",
+                                "name": data.game,
+                                "type": 0,
+                                "flags": 1
+                            } : {},
+                            socketId: "CustomRPC",
+                        });
                 }
                 const payload = {
                     type: "$deckcord_request",
@@ -101,7 +112,7 @@ function sleep(ms) {
                 ws.send(JSON.stringify(e));
             });
             Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().enabled = true;
-            Vencord.Webpack.Common.FluxDispatcher.dispatch({type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true})
+            Vencord.Webpack.Common.FluxDispatcher.dispatch({ type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true })
             console.log("MEDIA ENGINE ENABLED");
             clearInterval(t);
         }

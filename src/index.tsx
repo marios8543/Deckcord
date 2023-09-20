@@ -6,7 +6,8 @@ import {
   ServerAPI,
   staticClasses,
   Router,
-  Toggle
+  Toggle,
+  sleep
 } from "decky-frontend-lib";
 import { VFC, useState } from "react";
 import {
@@ -31,7 +32,8 @@ class DeckcordEvent extends Event {
 declare global {
   interface Window {
     DECKCORD: {
-      setState: any
+      setState: any,
+      appLifetimeUnregister: any
     }
   }
 }
@@ -145,9 +147,18 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
 };
 
 export default definePlugin((serverApi: ServerAPI) => {
+  try {
+    window.DECKCORD.appLifetimeUnregister();
+  } catch (error) {}
   const evtTarget = new _EventTarget();
   window.DECKCORD = {
-    setState: (s: any) => evtTarget.dispatchEvent(new DeckcordEvent(s))
+    setState: (s: any) => evtTarget.dispatchEvent(new DeckcordEvent(s)),
+    appLifetimeUnregister: SteamClient.GameSessions.RegisterForAppLifetimeNotifications(async () => {
+      await sleep(1000);
+      const app = Router.MainRunningApp;
+      console.log("Setting RPC", app);
+      serverApi.callPluginMethod("set_rpc", {game: app !== undefined ? app?.display_name : null});
+    }).unregister
   };
   const unpatchMenu = patchMenu();
   serverApi.routerHook.addRoute("/discord", () => {

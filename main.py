@@ -191,6 +191,10 @@ class Plugin:
 
     async def set_ptt(plugin, value):
         await Plugin.evt_handler.ws.send_json({"type": "$ptt", "value": value})
+    
+    async def set_rpc(plugin, game):
+        logger.info("Setting RPC")
+        await Plugin.evt_handler.ws.send_json({"type": "$rpc", "game": game})
 
     async def _unload(*args):
         if hasattr(Plugin, "runner"):
