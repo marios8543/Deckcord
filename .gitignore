@@ -55,3 +55,6 @@ out/*
 cli/
 cli/*
 cli/decky
+.vscode/tasks.json
+.vscode/setup.sh
+.vscode/defsettings.json
