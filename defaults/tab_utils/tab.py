@@ -1,6 +1,11 @@
 from pathlib import Path
+
+from aiohttp import ClientSession
 from .cdp import Tab, get_tab, get_tab_lambda, get_tabs
 from asyncio import sleep
+from ssl import create_default_context
+
+SSL_CTX = create_default_context(cafile="/home/deck/.local/lib/python3.10/site-packages/certifi/cacert.pem")
 
 async def create_discord_tab():
     while True:
@@ -39,6 +44,12 @@ async def create_discord_tab():
     """)
     await tab.close_websocket()
 
+async def fetch_vencord():
+    async with ClientSession() as session:
+        res = await session.get("https://raw.githubusercontent.com/Vencord/builds/main/Vencord.user.js", ssl=SSL_CTX)
+        if res.ok:
+            return await res.text()
+
 async def setup_discord_tab():
     tab = await get_tab_lambda(lambda tab: tab.url == "https://steamloopback.host/discord/init")
     await tab.open_websocket()
@@ -46,7 +57,7 @@ async def setup_discord_tab():
     await tab._send_devtools_cmd({
         "method": "Page.addScriptToEvaluateOnNewDocument",
         "params": {
-            "source": "window.unsafeWindow = window; " + open(Path(__file__).parent.parent.joinpath("Vencord.user.js"), "r").read(),
+            "source": "window.unsafeWindow = window; " + (await fetch_vencord()),
             "runImmediately": True
         }
     })

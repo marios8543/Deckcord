@@ -16,7 +16,7 @@ from tab_utils.tab import create_discord_tab,  \
                           setOSK,                         \
                           set_discord_tab_visibility,      \
                           inject_client_to_discord_tab
-from tab_utils.cdp import get_tab, get_tab_lambda
+from tab_utils.cdp import get_tab
 from discord_client.event_handler import EventHandler
 from proxy import process_fetch
 

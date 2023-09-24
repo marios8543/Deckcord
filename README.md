@@ -11,6 +11,7 @@
 - Show your current game as playing status.
 - Get notifications for DMs and pings in-game.
 - Push-to-talk support, with physical keybind to rear buttons. (WIP)
+- [Vencord](https://vencord.dev/) gets injected automatically before discord is loaded. It's needed to access a lot of the functionality that allows the plugin to do cool stuff, but also gives ya access to tons of other cool stuff.
 
 ## Issues
 - **IMPORTANT:** Deafen doesn't work. Rather, I believe you appear as deafened to others but can still hear them. This has to do with the peculiarities of enabling the Discord MediaEngine in the unique environment of the BrowserView, along with the rest of the tricks needed to get microphone input working there. **Better not enable deafen at all, or let others know what's up**. I will try to fix this soon.
