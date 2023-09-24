@@ -2,6 +2,19 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function dataURLtoFile(dataurl, filename) {
+    var arr = dataurl.split(','),
+        mime = arr[0].match(/:(.*?);/)[1],
+        bstr = atob(arr[arr.length - 1]),
+        n = bstr.length,
+        u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+}
+
+
 (function () {
     async function buildReadyObject() {
         while (true) {
@@ -17,6 +30,7 @@ function sleep(ms) {
             }
         }
     }
+
     function patchTypingField() {
         const t = setInterval(() => {
             try {
@@ -25,11 +39,45 @@ function sleep(ms) {
             } catch (err) { }
         }, 100)
     }
+
+    function sendAttachmentToChannel(channelId, attachment_b64, filename) {
+        return new Promise((resolve, reject) => {
+            const CloudUpload = Vencord.Webpack.find(m => m.prototype?.uploadFileToCloud);
+            const file = dataURLtoFile(`data:text/plain;base64,${attachment_b64}`, filename);
+    
+            const upload = new CloudUpload({
+                file: file,
+                isClip: false,
+                isThumbnail: false,
+                platform: 1,
+            }, channelId, false, 0);
+            upload.on("complete", () => {
+                Vencord.Webpack.Common.RestAPI.post({
+                    url: `/channels/${channelId}/messages`,
+                    body: {
+                        channel_id: channelId,
+                        content: "",
+                        nonce: Vencord.Webpack.Common.SnowflakeUtils.fromTimestamp(Date.now()),
+                        sticker_ids: [],
+                        type: 0,
+                        attachments: [{
+                            id: "0",
+                            filename: upload.filename,
+                            uploaded_filename: upload.uploadedFilename
+                        }]
+                    }
+                });
+                resolve(true);
+            });
+            upload.upload();
+        })
+    }
+
     var ws;
     function connect() {
         ws = new WebSocket('ws://127.0.0.1:65123/socket');
 
-        ws.onmessage = function (e) {
+        ws.onmessage = async function (e) {
             const data = JSON.parse(e.data);
             if (data.type.startsWith("$")) {
                 let result;
@@ -49,6 +97,17 @@ function sleep(ms) {
                             deaf: Vencord.Webpack.findStore("MediaEngineStore").isSelfDeaf()
                         }
                         break;
+                    case "$get_last_channels":
+                        result = {}
+                        const ChannelStore = Vencord.Webpack.Common.ChannelStore;
+                        const GuildStore = Vencord.Webpack.Common.GuildStore;
+                        const channelIds = Object.values(Vencord.Webpack.findStore("SelectedChannelStore").__getLocalVars().mostRecentSelectedTextChannelIds);
+                        for (const chId of channelIds) {
+                            const ch = ChannelStore.getChannel(chId);
+                            const guild = GuildStore.getGuild(ch.guild_id);
+                            result[chId] = `${ch.name} (${guild.name})`;
+                        }
+                        break;
                     case "$ptt":
                         try {
                             Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().connections.values().next().value.setForceAudioInput(data.value);
@@ -65,6 +124,11 @@ function sleep(ms) {
                             } : {},
                             socketId: "CustomRPC",
                         });
+                        return;
+                    case "$screenshot":
+                        await sendAttachmentToChannel(data.channel_id, data.attachment_b64, "screenshot.jpg");
+                        result = {}
+                        break;
                 }
                 const payload = {
                     type: "$deckcord_request",

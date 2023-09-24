@@ -28,7 +28,7 @@ SSL_CTX = create_default_context(cafile="/home/deck/.local/lib/python3.10/site-p
 class Plugin:
     server = Application()
     cors = aiohttp_cors.setup(server, defaults={
-        "https://discord.com": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(
             expose_headers="*",
             allow_headers="*",
             allow_credentials=True
@@ -68,13 +68,15 @@ class Plugin:
             get("/openkb", Plugin._openkb),
             get("/socket", Plugin._websocket_handler),
             get("/storeget", Plugin._storeget),
-            route("*", '/{tail:.*}', Plugin._proxy)
+            route("PUT", '/deckcord_upload/{tail:.*}', lambda req: Plugin._proxy(req, True)),
+            route("*", '/{tail:.*}', Plugin._proxy),
         ])
-        Plugin.cors.add(list(Plugin.server.router.routes())[0])
+        for r in list(Plugin.server.router.routes())[:-1]:
+            Plugin.cors.add(r)
         Plugin.runner = AppRunner(Plugin.server, access_log=None)
         await Plugin.runner.setup()
         logger.info("Starting server!!!")
-        await TCPSite(Plugin.runner, '127.0.0.1', 65123).start()
+        await TCPSite(Plugin.runner, '0.0.0.0', 65123).start()
         Plugin.shared_js_tab = await get_tab("SharedJSContext")
         await Plugin.shared_js_tab.open_websocket()
         create_task(Plugin._frontend_evt_dispatcher())
@@ -110,7 +112,7 @@ class Plugin:
         async for state in Plugin.evt_handler.yield_new_state():
             async def _():
                 await Plugin.shared_js_tab.ensure_open()
-                Plugin.shared_js_tab.evaluate(f"window.DECKCORD.setState(JSON.parse('{dumps(state)}'));")
+                await Plugin.shared_js_tab.evaluate(f"window.DECKCORD.setState(JSON.parse('{dumps(state)}'));")
             create_task(_())
     
     async def _notification_dispatcher():
@@ -132,34 +134,39 @@ class Plugin:
         elif req == "guild":
             return json_response(await Plugin.evt_handler.api.get_guild(id))
         
-    async def _proxy(request):
-        try:
-            req_headers = { k: v for k, v in request.headers.items()}
-            req_headers.update({
-                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
-                "Origin": "https://discord.com",
-                "Referer": "https://discord.com/app",
-                "Host": "discord.com"
+    async def _proxy(request, is_upload=False):
+        req_headers = { k: v for k, v in request.headers.items()}
+        req_headers.update({
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+            "Origin": "https://discord.com",
+            "Referer": "https://discord.com/app",
+            "Host": "discord.com" if not is_upload else "discord-attachments-uploads-prd.storage.googleapis.com"
+        })
+        async with ClientSession(auto_decompress=False) as session:
+            response = await session.request(request.method,
+                f"https://discord.com/{request.rel_url}" if not is_upload else
+                f"https://discord-attachments-uploads-prd.storage.googleapis.com/{str(request.rel_url).replace('/deckcord_upload/', '')}".strip(),
+                ssl=SSL_CTX,
+                headers=req_headers,
+                data=await request.read() if request.has_body else None
+            )
+            res_headers = { k: v for k, v in response.headers.items()}
+            res_headers.update({
+                "Access-Control-Allow-Origin": "https://steamloopback.host"
             })
-            async with ClientSession(auto_decompress=False) as session:
-                response = await session.request(request.method,
-                    f"https://discord.com/{request.rel_url}",
-                    ssl=SSL_CTX,
-                    headers=req_headers,
-                    data=await request.read() if request.has_body else None
-                )
-
-                res_headers = { k: v for k, v in response.headers.items()}
-                res_headers.update({
-                    "Access-Control-Allow-Origin": "https://steamloopback.host"
-                })
-                content = BytesIO(await response.content.read())
-                status = response.status
-                response.close()
-        except Exception as e:
-            print("Error in request %s", format_exc())
+            content = BytesIO(await response.content.read())
+            status = response.status
+            if not response.ok:
+                logger.debug(response.request_info)
+                logger.debug(response)
+                logger.debug(response.status)
+                logger.debug(res_headers)
+            response.close()
         b = content.read()
         res = StreamResponse(status=status, headers=res_headers)
+        if is_upload:
+            res.headers.pop("Access-Control-Allow-Origin")
+            res.headers.pop("Access-Control-Expose-Headers")
         await res.prepare(request)
         await res.write(b)
         return res
@@ -195,6 +202,13 @@ class Plugin:
     async def set_rpc(plugin, game):
         logger.info("Setting RPC")
         await Plugin.evt_handler.ws.send_json({"type": "$rpc", "game": game})
+    
+    async def get_last_channels(plugin):
+        return await plugin.evt_handler.api.get_last_channels()
+
+    async def post_screenshot(plugin, channel_id, data):
+        logger.info("Posting screenshot to " + channel_id)
+        return await Plugin.evt_handler.api.post_screenshot(channel_id, data)
 
     async def _unload(*args):
         if hasattr(Plugin, "runner"):

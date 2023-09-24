@@ -7,9 +7,11 @@ import {
   staticClasses,
   Router,
   Toggle,
-  sleep
+  sleep,
+  Dropdown,
+  DropdownOption
 } from "decky-frontend-lib";
-import { VFC, useState } from "react";
+import { VFC, useEffect, useMemo, useState } from "react";
 import {
   FaDiscord,
   FaMicrophoneAltSlash,
@@ -33,9 +35,20 @@ declare global {
   interface Window {
     DECKCORD: {
       setState: any,
-      appLifetimeUnregister: any
+      appLifetimeUnregister: any,
+      screenshotNotifUnregister: any
     }
   }
+}
+
+function urlContentToDataUri(url: string){
+  return  fetch(url)
+          .then( response => response.blob() )
+          .then( blob => new Promise( callback =>{
+              let reader = new FileReader() ;
+              reader.onload = function(){ callback(this.result) } ;
+              reader.readAsDataURL(blob) ;
+          }) ) ;
 }
 
 const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serverAPI, evtTarget }) => {
@@ -43,8 +56,29 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
   var unregisterPtt: any;
   const PTT_BUTTON = 33;
 
-  serverAPI.callPluginMethod("get_state", {}).then(s => setState(s.result));
+  const [screenshot, setScreenshot] = useState<any>();
+  const [selectedChannel, setChannel] = useState<any>();
+  const [uploadButtonDisabled, setUploadButtonDisabled] = useState<boolean>(false);
+  const channels = useMemo(
+    (): DropdownOption[] => [],
+    [],
+  );
+
   evtTarget.addEventListener("state", s => setState((s as DeckcordEvent).data));
+  SteamClient.Screenshots.GetLastScreenshotTaken().then((res: any) => setScreenshot(res));
+  SteamClient.GameSessions.RegisterForScreenshotNotification(async () => {
+    await sleep(500);
+    setScreenshot(await SteamClient.Screenshots.GetLastScreenshotTaken());
+  }).unregister
+
+  useEffect(() => {
+    serverAPI.callPluginMethod("get_state", {}).then(s => setState(s.result));
+    serverAPI.callPluginMethod("get_last_channels", {}).then(res => {
+      const channelList: {} = res.result;
+      for (const channelId in channelList) channels.push({ data: channelId, label: channelList[channelId] });
+      setChannel(channels[0].data);
+    });
+  }, []);
 
   function muteButton() {
     if (state?.me?.is_muted) {
@@ -79,7 +113,7 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
   function vcChannel() {
     if (state?.vc == undefined) return;
     return (
-      <div style={{marginTop: '-30px'}}>
+      <div style={{ marginTop: '-30px' }}>
         <h3>{state?.vc?.channel_name}</h3>
         <h4 style={{ marginTop: '-20px' }}>{state?.vc?.guild_name}</h4>
       </div>
@@ -97,9 +131,30 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
         </li>
       );
     }
-    return <ul style={{marginTop: '-30px'}}>{members}</ul>;
+    return <ul style={{ marginTop: '-30px' }}>{members}</ul>;
   }
 
+  function uploadScreenshot() {
+    return (
+      <div>
+        <img width={240} height={160} src={'https://steamloopback.host/' + screenshot?.strUrl}></img>
+        <Dropdown
+          menuLabel="Last Channels"
+          selectedOption={selectedChannel}
+          rgOptions={channels}
+          onChange={(e) => setChannel(e.data)}
+        ></Dropdown>
+        <DialogButton style={{marginTop: '5px'}} disabled={uploadButtonDisabled} onClick={async () => {
+          setUploadButtonDisabled(true);
+          const data = await urlContentToDataUri(`https://steamloopback.host/${screenshot.strUrl}`);
+          await serverAPI.callPluginMethod("post_screenshot", {channel_id: selectedChannel, data: data});
+          setUploadButtonDisabled(false);
+        }}>Upload</DialogButton>
+      </div>
+    )
+  }
+
+  //Not implemented because it crashes react. Probably mis-implementing the toggle somehow, otherwise PTT support is there 100%
   function pttSwitch() {
     const [pttEnabled, setPtt] = useState<boolean>();
     setPtt(false);
@@ -142,36 +197,45 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
         {vcChannel()}
         {vcMembers()}
       </PanelSectionRow>
+      <hr></hr>
+      <PanelSectionRow>
+        {uploadScreenshot()}
+      </PanelSectionRow>
     </PanelSection>
   );
 };
 
 export default definePlugin((serverApi: ServerAPI) => {
-  try {
-    window.DECKCORD.appLifetimeUnregister();
-  } catch (error) {}
   const evtTarget = new _EventTarget();
+
   window.DECKCORD = {
     setState: (s: any) => evtTarget.dispatchEvent(new DeckcordEvent(s)),
     appLifetimeUnregister: SteamClient.GameSessions.RegisterForAppLifetimeNotifications(async () => {
-      await sleep(1000);
+      await sleep(500);
       const app = Router.MainRunningApp;
       console.log("Setting RPC", app);
-      serverApi.callPluginMethod("set_rpc", {game: app !== undefined ? app?.display_name : null});
-    }).unregister
+      serverApi.callPluginMethod("set_rpc", { game: app !== undefined ? app?.display_name : null });
+    }).unregister,
+    screenshotNotifUnregister: null
   };
+
   const unpatchMenu = patchMenu();
   serverApi.routerHook.addRoute("/discord", () => {
     return <DiscordTab serverAPI={serverApi}></DiscordTab>
   });
+
   return {
     title: <div className={staticClasses.Title}>Deckcord</div>,
     content: <Content serverAPI={serverApi} evtTarget={evtTarget} />,
     icon: <FaDiscord />,
     onDismount() {
       unpatchMenu();
+      try {
+        window.DECKCORD.appLifetimeUnregister();
+        window.DECKCORD.screenshotNotifUnregister();
+      }
+      catch (error) {}
     },
+    alwaysRender: true
   };
 });
-//{pttSwitch()}
-//        

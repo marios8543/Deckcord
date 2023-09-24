@@ -52,11 +52,11 @@ class StoreAccess:
         response.result = result
         response.lock.set()
     
-    async def _store_access_request(self, command, id=""):
+    async def _store_access_request(self, command, id="", **kwargs):
         self.request_increment += 1
         response = Response()
         self.requests[self.request_increment] = response
-        await self.ws.send_json({"type": command, "id": id, "increment": self.request_increment})
+        await self.ws.send_json({"type": command, "id": id, "increment": self.request_increment, **kwargs})
         await response.lock.wait()
         return response.result
 
@@ -71,3 +71,9 @@ class StoreAccess:
     
     async def get_media(self):
         return await self._store_access_request("$getmedia")
+    
+    async def get_last_channels(self):
+        return await self._store_access_request("$get_last_channels")
+    
+    async def post_screenshot(self, channel_id, data):
+        return await self._store_access_request("$screenshot", channel_id=channel_id, attachment_b64=data)

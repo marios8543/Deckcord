@@ -64,6 +64,10 @@ async def process_fetch(tab):
                                 args[1] = args[1].replace("https://discord.com", "http://127.0.0.1:65123");
                                 console.log("XHR PATCH", args[1]);
                             }
+                            if (args[1].startsWith("https://discord-attachments-uploads-prd.storage.googleapis.com")) {
+                                args[1] = args[1].replace("https://discord-attachments-uploads-prd.storage.googleapis.com", "http://127.0.0.1:65123/deckcord_upload");
+                                console.log("XHR PATCH", args[1]);
+                            }
                             return origOpen.call(this, ...args);
                         };
 
