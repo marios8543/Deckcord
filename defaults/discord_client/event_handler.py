@@ -72,7 +72,7 @@ class EventHandler:
                 print('ws connection closed with exception %s' % self.ws.exception())
 
     async def _ready(self, data):
-        logger.info(f"Received ready event. {dumps(data)}")
+        logger.info(f"Received ready event")
         self.me = User(data["result"]["user"])
         self.me.is_muted = data["result"]["mute"]
         self.me.is_deafened = data["result"]["deaf"]
@@ -84,7 +84,8 @@ class EventHandler:
             self.vc_guild_name = ""
             return 
         self.vc_channel_name = (await self.api.get_channel(self.vc_channel_id))["name"]
-        self.vc_guild_name = (await self.api.get_guild(data["guildId"]))["name"]
+        if "guildId" in data and data["guildId"]:
+            self.vc_guild_name = (await self.api.get_guild(data["guildId"]))["name"]
         for user in self.voicestates[self.vc_channel_id].values():
             await user.populate(self.api)
     

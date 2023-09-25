@@ -81,59 +81,63 @@ function dataURLtoFile(dataurl, filename) {
             const data = JSON.parse(e.data);
             if (data.type.startsWith("$")) {
                 let result;
-                switch (data.type) {
-                    case "$getuser":
-                        result = Vencord.Webpack.Common.UserStore.getUser(data.id);
-                        break;
-                    case "$getchannel":
-                        result = Vencord.Webpack.Common.ChannelStore.getChannel(data.id);
-                        break;
-                    case "$getguild":
-                        result = Vencord.Webpack.Common.GuildStore.getGuild(data.id);
-                        break;
-                    case "$getmedia":
-                        result = {
-                            mute: Vencord.Webpack.findStore("MediaEngineStore").isSelfMute(),
-                            deaf: Vencord.Webpack.findStore("MediaEngineStore").isSelfDeaf()
-                        }
-                        break;
-                    case "$get_last_channels":
-                        result = {}
-                        const ChannelStore = Vencord.Webpack.Common.ChannelStore;
-                        const GuildStore = Vencord.Webpack.Common.GuildStore;
-                        const channelIds = Object.values(Vencord.Webpack.findStore("SelectedChannelStore").__getLocalVars().mostRecentSelectedTextChannelIds);
-                        for (const chId of channelIds) {
-                            const ch = ChannelStore.getChannel(chId);
-                            const guild = GuildStore.getGuild(ch.guild_id);
-                            result[chId] = `${ch.name} (${guild.name})`;
-                        }
-                        break;
-                    case "$ptt":
-                        try {
-                            Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().connections.values().next().value.setForceAudioInput(data.value);
-                        } catch (error) { }
-                        return;
-                    case "$rpc":
-                        Vencord.Webpack.Common.FluxDispatcher.dispatch({
-                            type: "LOCAL_ACTIVITY_UPDATE",
-                            activity: data.game ? {
-                                "application_id": "0",
-                                "name": data.game,
-                                "type": 0,
-                                "flags": 1
-                            } : {},
-                            socketId: "CustomRPC",
-                        });
-                        return;
-                    case "$screenshot":
-                        await sendAttachmentToChannel(data.channel_id, data.attachment_b64, "screenshot.jpg");
-                        result = {}
-                        break;
+                try {
+                    switch (data.type) {
+                        case "$getuser":
+                            result = Vencord.Webpack.Common.UserStore.getUser(data.id);
+                            break;
+                        case "$getchannel":
+                            result = Vencord.Webpack.Common.ChannelStore.getChannel(data.id);
+                            break;
+                        case "$getguild":
+                            result = Vencord.Webpack.Common.GuildStore.getGuild(data.id);
+                            break;
+                        case "$getmedia":
+                            result = {
+                                mute: Vencord.Webpack.findStore("MediaEngineStore").isSelfMute(),
+                                deaf: Vencord.Webpack.findStore("MediaEngineStore").isSelfDeaf()
+                            }
+                            break;
+                        case "$get_last_channels":
+                            result = {}
+                            const ChannelStore = Vencord.Webpack.Common.ChannelStore;
+                            const GuildStore = Vencord.Webpack.Common.GuildStore;
+                            const channelIds = Object.values(JSON.parse(Vencord.Util.localStorage.SelectedChannelStore).mostRecentSelectedTextChannelIds);
+                            for (const chId of channelIds) {
+                                const ch = ChannelStore.getChannel(chId);
+                                const guild = GuildStore.getGuild(ch.guild_id);
+                                result[chId] = `${ch.name} (${guild.name})`;
+                            }
+                            break;
+                        case "$ptt":
+                            try {
+                                Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().connections.values().next().value.setForceAudioInput(data.value);
+                            } catch (error) { }
+                            return;
+                        case "$rpc":
+                            Vencord.Webpack.Common.FluxDispatcher.dispatch({
+                                type: "LOCAL_ACTIVITY_UPDATE",
+                                activity: data.game ? {
+                                    "application_id": "0",
+                                    "name": data.game,
+                                    "type": 0,
+                                    "flags": 1
+                                } : {},
+                                socketId: "CustomRPC",
+                            });
+                            return;
+                        case "$screenshot":
+                            await sendAttachmentToChannel(data.channel_id, data.attachment_b64, "screenshot.jpg");
+                            result = {}
+                            break;
+                    }
+                } catch (error) {
+                    result = {error: error}
                 }
                 const payload = {
                     type: "$deckcord_request",
                     increment: data.increment,
-                    result: result
+                    result: result || {}
                 };
                 console.debug(data, payload);
                 ws.send(JSON.stringify(payload));
@@ -178,6 +182,11 @@ function dataURLtoFile(dataurl, filename) {
             Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().enabled = true;
             Vencord.Webpack.Common.FluxDispatcher.dispatch({ type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true })
             console.log("MEDIA ENGINE ENABLED");
+            if (window.location.pathname == "/login") {
+                for (const el of document.getElementsByTagName('input')) {
+                    el.onclick = (ev) => fetch("http://127.0.0.1:65123/openkb", { mode: "no-cors" });
+                }
+            }
             clearInterval(t);
         }
         catch (err) { }

@@ -5,8 +5,6 @@ from .cdp import Tab, get_tab, get_tab_lambda, get_tabs
 from asyncio import sleep
 from ssl import create_default_context
 
-SSL_CTX = create_default_context(cafile="/etc/ssl/cert.pem")
-
 async def create_discord_tab():
     while True:
         try:
@@ -15,38 +13,46 @@ async def create_discord_tab():
         except:
             await sleep(0.1)
     await tab.open_websocket()
-    await tab.evaluate("""
-                if (window.DISCORD_TAB !== undefined) {
-                    window.DISCORD_TAB.m_browserView.SetVisible(false);
-                    window.DISCORD_TAB.Destroy();
-                    //window.DISCORD_TAB.unregisterCloseKeybind();
-                    window.DISCORD_TAB = undefined;
-                }
-                window.DISCORD_TAB = window.DFL.Router.WindowStore.GamepadUIMainWindowInstance.CreateBrowserView("discord");
-                window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 495);
-                window.DISCORD_TAB.m_browserView.LoadURL("https://steamloopback.host/discord/init");
-                       
-                DFL.Router.WindowStore.GamepadUIMainWindowInstance.m_VirtualKeyboardManager.IsShowingVirtualKeyboard.m_callbacks.m_vecCallbacks.push((e) => {
-                    if (!e) {
-                        const bounds = window.DISCORD_TAB.m_browserView.GetBounds();
-                        if (bounds.height != 495) {
-                            window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 495);
+    while True:
+        await tab.evaluate("""
+                    if (window.DISCORD_TAB !== undefined) {
+                        window.DISCORD_TAB.m_browserView.SetVisible(false);
+                        window.DISCORD_TAB.Destroy();
+                        //window.DISCORD_TAB.unregisterCloseKeybind();
+                        window.DISCORD_TAB = undefined;
+                    }
+                    window.DISCORD_TAB = window.DFL.Router.WindowStore.GamepadUIMainWindowInstance.CreateBrowserView("discord");
+                    window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 495);
+                    window.DISCORD_TAB.m_browserView.LoadURL("https://steamloopback.host/discord/init");
+                        
+                    DFL.Router.WindowStore.GamepadUIMainWindowInstance.m_VirtualKeyboardManager.IsShowingVirtualKeyboard.m_callbacks.m_vecCallbacks.push((e) => {
+                        if (!e) {
+                            const bounds = window.DISCORD_TAB.m_browserView.GetBounds();
+                            if (bounds.height != 495) {
+                                window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 495);
+                            }
                         }
-                    }
-                });
-                /*window.DISCORD_TAB.unregisterCloseKeybind = SteamClient.Input.RegisterForControllerInputMessages(e => {
-                    const ev = e[0];
-                    if (ev.nA == 1 && !ev.bS && window.DISCORD_TAB.m_refKeyboard.BIsActive()) {
-                       console.log("closing...")
-                       fetch("http://127.0.0.1:65123/close", { mode: "no-cors" });
-                    }
-                }).unregister;*/
-    """)
+                    });
+                    /*window.DISCORD_TAB.unregisterCloseKeybind = SteamClient.Input.RegisterForControllerInputMessages(e => {
+                        const ev = e[0];
+                        if (ev.nA == 1 && !ev.bS && window.DISCORD_TAB.m_refKeyboard.BIsActive()) {
+                        console.log("closing...")
+                        fetch("http://127.0.0.1:65123/close", { mode: "no-cors" });
+                        }
+                    }).unregister;*/
+        """)
+        await sleep(3)
+        try:
+            await get_tab_lambda(lambda tab: tab.url == "https://steamloopback.host/discord/init")
+            break
+        except:
+            pass
     await tab.close_websocket()
 
 async def fetch_vencord():
     async with ClientSession() as session:
-        res = await session.get("https://raw.githubusercontent.com/Vencord/builds/main/Vencord.user.js", ssl=SSL_CTX)
+        res = await session.get("https://raw.githubusercontent.com/Vencord/builds/main/Vencord.user.js",
+                                ssl=create_default_context(cafile="/etc/ssl/cert.pem"))
         if res.ok:
             return await res.text()
 

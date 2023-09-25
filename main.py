@@ -1,10 +1,9 @@
-from aiohttp.web import Application, get, WebSocketResponse, json_response, StreamResponse, route, AppRunner, TCPSite
+from aiohttp.web import Application, get, WebSocketResponse, StreamResponse, route, AppRunner, TCPSite
 from aiohttp import ClientSession
 from asyncio import sleep, ensure_future, create_task
 import aiohttp_cors
 from ssl import create_default_context
 from io import BytesIO
-from traceback import format_exc
 from json import dumps
 
 import os, sys
@@ -22,8 +21,6 @@ from proxy import process_fetch
 
 from decky_plugin import logger
 logger.setLevel(10)
-
-SSL_CTX = create_default_context(cafile="/etc/ssl/cert.pem")
 
 class Plugin:
     server = Application()
@@ -43,7 +40,7 @@ class Plugin:
                 tab = await setup_discord_tab()
                 create_task(process_fetch(tab))
                 break
-            except:
+            except Exception as e:
                 await sleep(0.1)
         while True:
             try:
@@ -61,13 +58,14 @@ class Plugin:
         ensure_future(_())
 
     async def _main(self):
+        logger.info("Starting Deckcord backend")
         await Plugin.initialize()
+        logger.info("Discord initialized")
         Plugin.server.add_routes([
             get("/close", Plugin._close),
             get("/open", Plugin._open),
             get("/openkb", Plugin._openkb),
             get("/socket", Plugin._websocket_handler),
-            get("/storeget", Plugin._storeget),
             route("PUT", '/deckcord_upload/{tail:.*}', lambda req: Plugin._proxy(req, True)),
             route("*", '/{tail:.*}', Plugin._proxy),
         ])
@@ -75,7 +73,7 @@ class Plugin:
             Plugin.cors.add(r)
         Plugin.runner = AppRunner(Plugin.server, access_log=None)
         await Plugin.runner.setup()
-        logger.info("Starting server!!!")
+        logger.info("Starting server.")
         await TCPSite(Plugin.runner, '0.0.0.0', 65123).start()
         Plugin.shared_js_tab = await get_tab("SharedJSContext")
         await Plugin.shared_js_tab.open_websocket()
@@ -123,16 +121,6 @@ class Plugin:
             })
             await Plugin.shared_js_tab.ensure_open()
             await Plugin.shared_js_tab.evaluate(f"DeckyPluginLoader.toaster.toast(JSON.parse('{payload}'));")
-    
-    async def _storeget(request):
-        req = request.query.get("type")
-        id = request.query.get("id")
-        if req == "user":
-            return json_response(await Plugin.evt_handler.api.get_user(id))
-        elif req == "channel":
-            return json_response(await Plugin.evt_handler.api.get_channel(id))
-        elif req == "guild":
-            return json_response(await Plugin.evt_handler.api.get_guild(id))
         
     async def _proxy(request, is_upload=False):
         req_headers = { k: v for k, v in request.headers.items()}
@@ -146,7 +134,7 @@ class Plugin:
             response = await session.request(request.method,
                 f"https://discord.com/{request.rel_url}" if not is_upload else
                 f"https://discord-attachments-uploads-prd.storage.googleapis.com/{str(request.rel_url).replace('/deckcord_upload/', '')}".strip(),
-                ssl=SSL_CTX,
+                ssl=create_default_context(cafile="/etc/ssl/cert.pem"),
                 headers=req_headers,
                 data=await request.read() if request.has_body else None
             )
@@ -172,9 +160,7 @@ class Plugin:
         return res
     
     async def get_state(*args):
-        s = Plugin.evt_handler.build_state_dict()
-        #logger.info("STATE", s)
-        return s
+        return Plugin.evt_handler.build_state_dict()
     
     async def toggle_mute(*args):
         logger.info("Toggling mute")
