@@ -7,7 +7,7 @@ from asyncio import create_task
 
 logger = getLogger("proxy_utils")
 logger.setLevel(DEBUG)
-SSL_CTX = create_default_context(cafile="/home/deck/.local/lib/python3.10/site-packages/certifi/cacert.pem")
+SSL_CTX = create_default_context(cafile="/etc/ssl/cert.pem")
 
 async def fetch_discord():
     async with ClientSession() as session:

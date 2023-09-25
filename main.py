@@ -23,7 +23,7 @@ from proxy import process_fetch
 from decky_plugin import logger
 logger.setLevel(10)
 
-SSL_CTX = create_default_context(cafile="/home/deck/.local/lib/python3.10/site-packages/certifi/cacert.pem")
+SSL_CTX = create_default_context(cafile="/etc/ssl/cert.pem")
 
 class Plugin:
     server = Application()

@@ -5,7 +5,7 @@ from .cdp import Tab, get_tab, get_tab_lambda, get_tabs
 from asyncio import sleep
 from ssl import create_default_context
 
-SSL_CTX = create_default_context(cafile="/home/deck/.local/lib/python3.10/site-packages/certifi/cacert.pem")
+SSL_CTX = create_default_context(cafile="/etc/ssl/cert.pem")
 
 async def create_discord_tab():
     while True:
