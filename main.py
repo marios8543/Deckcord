@@ -164,10 +164,12 @@ class Plugin:
     
     async def open_discord(*args):
         logger.info("Setting discord visibility to true")
+        await Plugin.shared_js_tab.ensure_open()
         await set_discord_tab_visibility(Plugin.shared_js_tab, True)
     
     async def close_discord(*args):
         logger.info("Setting discord visibility to false")
+        await Plugin.shared_js_tab.ensure_open()
         await set_discord_tab_visibility(Plugin.shared_js_tab, False)
 
     async def set_ptt(plugin, value):

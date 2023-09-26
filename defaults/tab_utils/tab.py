@@ -100,10 +100,8 @@ async def inject_client_to_discord_tab():
 async def setOSK(tab: Tab, state):
     if state:
         await tab.evaluate("DISCORD_TAB.m_virtualKeyboardHost.m_showKeyboard()")
-#        await tab.evaluate("window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 295)")
     else:
         await tab.evaluate("DISCORD_TAB.m_virtualKeyboardHost.m_hideKeyboard()")
-#        await tab.evaluate("window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 495)")
 
 async def set_discord_tab_visibility(tab: Tab, visibility):
     await tab.evaluate(f"""

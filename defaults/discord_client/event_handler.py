@@ -22,6 +22,7 @@ class EventHandler:
             "RPC_NOTIFICATION_CREATE": self._notification_create
         }
 
+        self.ready = False
         self.me = User({"id": "", "username": "", "discriminator": None, "avatar": ""})
         self.voicestates = {}
 
@@ -76,6 +77,7 @@ class EventHandler:
         self.me = User(data["result"]["user"])
         self.me.is_muted = data["result"]["mute"]
         self.me.is_deafened = data["result"]["deaf"]
+        self.ready = True
 
     async def _voice_channel_select(self, data):
         self.vc_channel_id = data["channelId"]
@@ -112,6 +114,7 @@ class EventHandler:
 
     def build_state_dict(self):
         r = {
+            "ready": self.ready,
             "me": self.me.to_dict(),
             "vc": {}
         }

@@ -174,36 +174,43 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
     }}></Toggle></span>
   }
 
-  return (
-    <PanelSection>
-      <PanelSectionRow>
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          {muteButton()}
-          {deafenButton()}
-          <DialogButton onClick={() => { serverAPI.callPluginMethod("disconnect_vc", {}) }}
-            style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px' }}
-          ><FaPlug /></DialogButton>
-        </div>
-      </PanelSectionRow>
-      <hr></hr>
-      <PanelSectionRow>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ marginTop: '-10px' }}>
-            <img src={'https://cdn.discordapp.com/avatars/' + state?.me?.id + '/' + state?.me?.avatar + '.webp'} width={32} height={32} />
-            {state?.me?.username}
-          </span>
-        </div>
-      </PanelSectionRow>
-      <PanelSectionRow>
-        {vcChannel()}
-        {vcMembers()}
-      </PanelSectionRow>
-      <hr></hr>
-      <PanelSectionRow>
-        {uploadScreenshot()}
-      </PanelSectionRow>
-    </PanelSection>
-  );
+  if (state?.ready) {
+    return (
+      <PanelSection>
+        <PanelSectionRow>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            {muteButton()}
+            {deafenButton()}
+            <DialogButton onClick={() => { serverAPI.callPluginMethod("disconnect_vc", {}) }}
+              style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px' }}
+            ><FaPlug /></DialogButton>
+          </div>
+        </PanelSectionRow>
+        <hr></hr>
+        <PanelSectionRow>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ marginTop: '-10px' }}>
+              <img src={'https://cdn.discordapp.com/avatars/' + state?.me?.id + '/' + state?.me?.avatar + '.webp'} width={32} height={32} />
+              {state?.me?.username}
+            </span>
+          </div>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          {vcChannel()}
+          {vcMembers()}
+        </PanelSectionRow>
+        <hr></hr>
+        <PanelSectionRow>
+          {uploadScreenshot()}
+        </PanelSectionRow>
+      </PanelSection>
+    );
+  }
+  else {
+    return (
+      <h3>Initializing...</h3>
+    )
+  }
 };
 
 export default definePlugin((serverApi: ServerAPI) => {
