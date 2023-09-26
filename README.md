@@ -15,5 +15,3 @@
 
 ## Issues
 - **IMPORTANT:** Deafen doesn't work. Rather, I believe you appear as deafened to others but can still hear them. This has to do with the peculiarities of enabling the Discord MediaEngine in the unique environment of the BrowserView, along with the rest of the tricks needed to get microphone input working there. **Better not enable deafen at all, or let others know what's up**. I will try to fix this soon.
-- Only the message input field is patched to allow the on-screen keyboard to pop-up. So no text input anywhere else (search, login, etc). You'll need some input method to type in your login credentials (e.g external keyboard)
-- On first boot, the backend does not start for some reason. If you just started your deck and it doesn't work, try reloading the plugin.

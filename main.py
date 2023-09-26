@@ -20,7 +20,8 @@ from discord_client.event_handler import EventHandler
 from proxy import process_fetch
 
 from decky_plugin import logger
-logger.setLevel(10)
+from logging import INFO
+logger.setLevel(INFO)
 
 class Plugin:
     server = Application()
@@ -62,8 +63,6 @@ class Plugin:
         await Plugin.initialize()
         logger.info("Discord initialized")
         Plugin.server.add_routes([
-            get("/close", Plugin._close),
-            get("/open", Plugin._open),
             get("/openkb", Plugin._openkb),
             get("/socket", Plugin._websocket_handler),
             route("PUT", '/deckcord_upload/{tail:.*}', lambda req: Plugin._proxy(req, True)),
@@ -81,17 +80,6 @@ class Plugin:
         create_task(Plugin._notification_dispatcher())
         while True:
             await sleep(3600)
-    
-    async def _close(request):
-        await Plugin.shared_js_tab.ensure_open()
-        await set_discord_tab_visibility(Plugin.shared_js_tab, False)
-        logger.info("Setting discord visibility to false")
-        return "OK"
-    
-    async def _open(request):
-        await Plugin.shared_js_tab.ensure_open()
-        await set_discord_tab_visibility(Plugin.shared_js_tab, True)
-        return "OK"
     
     async def _openkb(request):
         await Plugin.shared_js_tab.ensure_open()
@@ -199,3 +187,10 @@ class Plugin:
     async def _unload(*args):
         if hasattr(Plugin, "runner"):
             await Plugin.runner.cleanup()
+        await Plugin.shared_js_tab.ensure_open()
+        await Plugin.shared_js_tab.evaluate("""
+            window.DISCORD_TAB.m_browserView.SetVisible(false);
+            window.DISCORD_TAB.Destroy();
+            window.DISCORD_TAB = undefined;
+        """)
+        await Plugin.shared_js_tab.close_websocket()

@@ -74,6 +74,7 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
   useEffect(() => {
     serverAPI.callPluginMethod("get_state", {}).then(s => setState(s.result));
     serverAPI.callPluginMethod("get_last_channels", {}).then(res => {
+      if ("error" in (res.result as {})) return;
       const channelList: {} = res.result;
       for (const channelId in channelList) channels.push({ data: channelId, label: channelList[channelId] });
       setChannel(channels[0].data);
