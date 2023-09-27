@@ -138,7 +138,11 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
           menuLabel="Last Channels"
           selectedOption={selectedChannel}
           rgOptions={channels}
-          onChange={(e) => setChannel(e.data)}
+          onChange={(e) => {
+            setChannel(e.data);
+            if (window.location.pathname == "/routes/discord") serverAPI.callPluginMethod("open_discord", {})
+          }}
+          onMenuOpened={() => serverAPI.callPluginMethod("close_discord", {})}
         ></Dropdown>
         <DialogButton style={{marginTop: '5px'}} disabled={uploadButtonDisabled} onClick={async () => {
           setUploadButtonDisabled(true);

@@ -40,11 +40,15 @@ function dataURLtoFile(dataurl, filename) {
         }, 100)
     }
 
-    const CloudUpload = Vencord.Webpack.findLazy(m => m.prototype?.uploadFileToCloud);
+    let CloudUpload;
+    const tt = setInterval(() => {
+        CloudUpload = Vencord.Webpack.find(m => m.prototype?.uploadFileToCloud);
+        console.log(CloudUpload);
+        if (CloudUpload !== undefined && CloudUpload !== null) clearInterval(tt);
+    });
     function sendAttachmentToChannel(channelId, attachment_b64, filename) {
         return new Promise((resolve, reject) => {
             const file = dataURLtoFile(`data:text/plain;base64,${attachment_b64}`, filename);
-    
             const upload = new CloudUpload({
                 file: file,
                 isClip: false,
@@ -108,6 +112,9 @@ function dataURLtoFile(dataurl, filename) {
                                 const guild = GuildStore.getGuild(ch.guild_id);
                                 result[chId] = `${ch.name} (${guild.name})`;
                             }
+                            break;
+                        case "$get_screen_bounds":
+                            result = {width: screen.width, height: screen.height}
                             break;
                         case "$ptt":
                             try {

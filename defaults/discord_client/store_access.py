@@ -77,3 +77,6 @@ class StoreAccess:
     
     async def post_screenshot(self, channel_id, data):
         return await self._store_access_request("$screenshot", channel_id=channel_id, attachment_b64=data)
+    
+    async def get_screen_bounds(self):
+        return await self._store_access_request("$get_screen_bounds")

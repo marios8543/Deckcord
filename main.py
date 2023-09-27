@@ -105,7 +105,7 @@ class Plugin:
         ws = WebSocketResponse()
         await ws.prepare(request)
         Plugin.wd_task = create_task(Plugin.increment_counter())
-        Plugin.wd_task.add_done_callback(lambda: create_task(Plugin.initialize()))
+        Plugin.wd_task.add_done_callback(lambda _: create_task(Plugin.initialize()))
         async for ping in Plugin.evt_handler.main(ws):
             if ping:
                 Plugin.counter = 0
