@@ -40,9 +40,9 @@ function dataURLtoFile(dataurl, filename) {
         }, 100)
     }
 
+    const CloudUpload = Vencord.Webpack.findLazy(m => m.prototype?.uploadFileToCloud);
     function sendAttachmentToChannel(channelId, attachment_b64, filename) {
         return new Promise((resolve, reject) => {
-            const CloudUpload = Vencord.Webpack.find(m => m.prototype?.uploadFileToCloud);
             const file = dataURLtoFile(`data:text/plain;base64,${attachment_b64}`, filename);
     
             const upload = new CloudUpload({
@@ -113,6 +113,14 @@ function dataURLtoFile(dataurl, filename) {
                             try {
                                 Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().connections.values().next().value.setForceAudioInput(data.value);
                             } catch (error) { }
+                            return;
+                        case "$setptt":
+                            Vencord.Webpack.Common.FluxDispatcher.dispatch({
+                                "type": "AUDIO_SET_MODE",
+                                "context": "default",
+                                "mode": data.enabled ? "PUSH_TO_TALK" : "VOICE_ACTIVITY",
+                                "options": Vencord.Webpack.findStore("MediaEngineStore").getSettings().modeOptions
+                            });
                             return;
                         case "$rpc":
                             Vencord.Webpack.Common.FluxDispatcher.dispatch({
@@ -187,6 +195,11 @@ function dataURLtoFile(dataurl, filename) {
                     el.onclick = (ev) => fetch("http://127.0.0.1:65123/openkb", { mode: "no-cors" });
                 }
             }
+            setInterval(() => {
+                try {
+                    ws.send(JSON.stringify({type: "$ping"}));
+                } catch (error) {}
+            }, 5000)
             clearInterval(t);
         }
         catch (err) { }

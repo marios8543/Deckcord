@@ -36,7 +36,8 @@ declare global {
     DECKCORD: {
       setState: any,
       appLifetimeUnregister: any,
-      screenshotNotifUnregister: any
+      pttEnabled: boolean,
+      pttUpdated: any
     }
   }
 }
@@ -53,8 +54,6 @@ function urlContentToDataUri(url: string){
 
 const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serverAPI, evtTarget }) => {
   const [state, setState] = useState<any | undefined>();
-  var unregisterPtt: any;
-  const PTT_BUTTON = 33;
 
   const [screenshot, setScreenshot] = useState<any>();
   const [selectedChannel, setChannel] = useState<any>();
@@ -65,11 +64,6 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
   );
 
   evtTarget.addEventListener("state", s => setState((s as DeckcordEvent).data));
-  SteamClient.Screenshots.GetLastScreenshotTaken().then((res: any) => setScreenshot(res));
-  SteamClient.GameSessions.RegisterForScreenshotNotification(async () => {
-    await sleep(500);
-    setScreenshot(await SteamClient.Screenshots.GetLastScreenshotTaken());
-  }).unregister
 
   useEffect(() => {
     serverAPI.callPluginMethod("get_state", {}).then(s => setState(s.result));
@@ -79,6 +73,7 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
       for (const channelId in channelList) channels.push({ data: channelId, label: channelList[channelId] });
       setChannel(channels[0].data);
     });
+    SteamClient.Screenshots.GetLastScreenshotTaken().then((res: any) => setScreenshot(res));
   }, []);
 
   function muteButton() {
@@ -155,23 +150,16 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
     )
   }
 
-  //Not implemented because it crashes react. Probably mis-implementing the toggle somehow, otherwise PTT support is there 100%
+  const [_pttEnabled, setPtt] = useState<boolean>(window.DECKCORD.pttEnabled);
   function pttSwitch() {
-    const [pttEnabled, setPtt] = useState<boolean>();
-    setPtt(false);
-    <span style={{ display: 'flex' }}>PTT: <Toggle value={!pttEnabled} onChange={(checked) => {
-      setPtt(!pttEnabled)
-      if (pttEnabled) {
-        unregisterPtt = SteamClient.Input.RegisterForControllerInputMessages((events: any) => {
-          for (const event of events) {
-            if (event.nA == PTT_BUTTON) {
-              serverAPI.callPluginMethod("set_ptt", { value: event.bS })
-            }
-          }
-        }).unregister;
-      }
-      else unregisterPtt();
-    }}></Toggle></span>
+    return (
+      <span style={{ display: 'flex' }}>PTT: <Toggle value={_pttEnabled} onChange={(checked) => {
+        setPtt(checked)
+        window.DECKCORD.pttEnabled = !_pttEnabled;
+        window.DECKCORD.pttUpdated();
+        console.log(checked, _pttEnabled);
+      }}></Toggle></span>
+    )
   }
 
   if (state?.ready) {
@@ -184,6 +172,11 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
             <DialogButton onClick={() => { serverAPI.callPluginMethod("disconnect_vc", {}) }}
               style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px' }}
             ><FaPlug /></DialogButton>
+          </div>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <div style={{ marginTop: '-8px', display: "flex", justifyContent: "center" }}>
+            {pttSwitch()}
           </div>
         </PanelSectionRow>
         <hr></hr>
@@ -215,16 +208,37 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
 
 export default definePlugin((serverApi: ServerAPI) => {
   const evtTarget = new _EventTarget();
+  const PTT_BUTTON = 33;
+  let unregisterPtt = () => {};
 
+  const setPlaying = () => {
+    const app = Router.MainRunningApp;
+    serverApi.callPluginMethod("set_rpc", { game: app !== undefined ? app?.display_name : null });
+  }
+  setPlaying();
   window.DECKCORD = {
     setState: (s: any) => evtTarget.dispatchEvent(new DeckcordEvent(s)),
     appLifetimeUnregister: SteamClient.GameSessions.RegisterForAppLifetimeNotifications(async () => {
       await sleep(500);
-      const app = Router.MainRunningApp;
-      console.log("Setting RPC", app);
-      serverApi.callPluginMethod("set_rpc", { game: app !== undefined ? app?.display_name : null });
+      setPlaying();
     }).unregister,
-    screenshotNotifUnregister: null
+    pttEnabled: false,
+    pttUpdated: () => {
+      if (window.DECKCORD.pttEnabled) {
+        serverApi.callPluginMethod("enable_ptt", {enabled: true});
+        unregisterPtt = SteamClient.Input.RegisterForControllerInputMessages((events: any) => {
+          for (const event of events) {
+            if (event.nA == PTT_BUTTON) {
+              serverApi.callPluginMethod("set_ptt", { value: event.bS })
+            }
+          }
+        }).unregister;
+      }
+      else {
+        unregisterPtt();
+        serverApi.callPluginMethod("enable_ptt", {enabled: false});
+      }
+    }
   };
 
   const unpatchMenu = patchMenu();
@@ -240,7 +254,6 @@ export default definePlugin((serverApi: ServerAPI) => {
       unpatchMenu();
       try {
         window.DECKCORD.appLifetimeUnregister();
-        window.DECKCORD.screenshotNotifUnregister();
       }
       catch (error) {}
     },

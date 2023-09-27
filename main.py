@@ -62,6 +62,7 @@ class Plugin:
         logger.info("Starting Deckcord backend")
         await Plugin.initialize()
         logger.info("Discord initialized")
+
         Plugin.server.add_routes([
             get("/openkb", Plugin._openkb),
             get("/socket", Plugin._websocket_handler),
@@ -74,10 +75,12 @@ class Plugin:
         await Plugin.runner.setup()
         logger.info("Starting server.")
         await TCPSite(Plugin.runner, '0.0.0.0', 65123).start()
+
         Plugin.shared_js_tab = await get_tab("SharedJSContext")
         await Plugin.shared_js_tab.open_websocket()
         create_task(Plugin._frontend_evt_dispatcher())
         create_task(Plugin._notification_dispatcher())
+
         while True:
             await sleep(3600)
     
@@ -87,12 +90,25 @@ class Plugin:
         logger.info("Setting discord visibility to true")
         return "OK"
 
+    WD_SECONDS = 6
+    counter = 0
+    wd_task = None
+    async def increment_counter():
+        while True:
+            if Plugin.counter == Plugin.WD_SECONDS:
+                logger.fatal(f"Did not hear back from the discord tab in {Plugin.WD_SECONDS}. Re-initializing...")
+                return
+            Plugin.counter += 1
+            await sleep(1)
     async def _websocket_handler(request):
         logger.info("Received websocket connection!")
         ws = WebSocketResponse()
         await ws.prepare(request)
-        await Plugin.evt_handler.main(ws)
-        return ws
+        Plugin.wd_task = create_task(Plugin.increment_counter())
+        Plugin.wd_task.add_done_callback(lambda: create_task(Plugin.initialize()))
+        async for ping in Plugin.evt_handler.main(ws):
+            if ping:
+                Plugin.counter = 0
     
     async def _frontend_evt_dispatcher():
         async for state in Plugin.evt_handler.yield_new_state():
@@ -175,6 +191,9 @@ class Plugin:
     async def set_ptt(plugin, value):
         await Plugin.evt_handler.ws.send_json({"type": "$ptt", "value": value})
     
+    async def enable_ptt(plugin, enabled):
+        await Plugin.evt_handler.ws.send_json({"type": "$setptt", "enabled": enabled})
+    
     async def set_rpc(plugin, game):
         logger.info("Setting RPC")
         await Plugin.evt_handler.ws.send_json({"type": "$rpc", "game": game})
@@ -189,10 +208,11 @@ class Plugin:
     async def _unload(*args):
         if hasattr(Plugin, "runner"):
             await Plugin.runner.cleanup()
-        await Plugin.shared_js_tab.ensure_open()
-        await Plugin.shared_js_tab.evaluate("""
-            window.DISCORD_TAB.m_browserView.SetVisible(false);
-            window.DISCORD_TAB.Destroy();
-            window.DISCORD_TAB = undefined;
-        """)
-        await Plugin.shared_js_tab.close_websocket()
+        if hasattr(Plugin, "shared_js_tab"):
+            await Plugin.shared_js_tab.ensure_open()
+            await Plugin.shared_js_tab.evaluate("""
+                window.DISCORD_TAB.m_browserView.SetVisible(false);
+                window.DISCORD_TAB.Destroy();
+                window.DISCORD_TAB = undefined;
+            """)
+            await Plugin.shared_js_tab.close_websocket()
