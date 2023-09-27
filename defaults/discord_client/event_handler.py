@@ -83,10 +83,10 @@ class EventHandler:
         async for msg in self.ws:
             if msg.type == WSMsgType.TEXT:
                 self._process_event(loads(msg.data))
-                yield True
+                #yield True
             elif msg.type == WSMsgType.ERROR:
                 print('ws connection closed with exception %s' % self.ws.exception())
-                yield False
+                #yield False
 
     def _process_event(self, data):
         if data["type"] == "$ping":

@@ -104,11 +104,12 @@ class Plugin:
         logger.info("Received websocket connection!")
         ws = WebSocketResponse()
         await ws.prepare(request)
-        Plugin.wd_task = create_task(Plugin.increment_counter())
-        Plugin.wd_task.add_done_callback(lambda _: create_task(Plugin.initialize()))
-        async for ping in Plugin.evt_handler.main(ws):
-            if ping:
-                Plugin.counter = 0
+        #Plugin.wd_task = create_task(Plugin.increment_counter())
+        #Plugin.wd_task.add_done_callback(lambda _: create_task(Plugin.initialize()))
+        #async for ping in Plugin.evt_handler.main(ws):
+        #    if ping:
+        #        Plugin.counter = 0
+        await Plugin.evt_handler.main(ws)
     
     async def _frontend_evt_dispatcher():
         async for state in Plugin.evt_handler.yield_new_state():
