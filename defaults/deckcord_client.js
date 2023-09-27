@@ -148,6 +148,7 @@ function dataURLtoFile(dataurl, filename) {
                     }
                 } catch (error) {
                     result = {error: error}
+                    if (data.increment == undefined) return;
                 }
                 const payload = {
                     type: "$deckcord_request",
