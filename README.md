@@ -10,5 +10,5 @@
 - One-button post steam screenshots to your recent channels.
 - Show your current game as playing status.
 - Get notifications for DMs and pings in-game.
-- Push-to-talk support, with physical keybind to rear buttons. (WIP)
+- Push-to-talk support, with physical keybind to rear buttons. (R5 Button)
 - [Vencord](https://vencord.dev/) gets injected automatically before discord is loaded. It's needed to access a lot of the functionality that allows the plugin to do cool stuff, but also gives ya access to tons of other cool stuff.
