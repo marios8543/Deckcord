@@ -18,30 +18,32 @@ async def fetch_discord():
             return t
         
 async def handle_paused_request(msg, tab, session: ClientSession):
-    params = msg.get("params")
-    request_id = params.get("requestId")
-    headers = params.get("request").get("headers")
-    method = params.get("request").get("method")
-    url = params.get("request").get("url")
-    #print("paused request: ", url)
-    headers.update({
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
-        "Referer": "https://discord.com/app",
-        "Host": "discord.com"
-    })
-    response = await session.request(method, url, ssl=SSL_CTX, headers=headers)
-    response_text = (await response.content.read())
     try:
-        response_utf = response_text.decode("utf-8")
-        response_utf = response_utf.replace("=\"/assets/\"", "=\"https://discord.com/assets/\"")
-        response_text = response_utf.encode("utf-8")
+        params = msg.get("params")
+        request_id = params.get("requestId")
+        headers = params.get("request").get("headers")
+        method = params.get("request").get("method")
+        url = params.get("request").get("url")
+        #print("paused request: ", url)
+        headers.update({
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+            "Referer": "https://discord.com/app",
+            "Host": "discord.com"
+        })
+        response = await session.request(method, url, ssl=SSL_CTX, headers=headers)
+        response_text = (await response.content.read())
+        try:
+            response_utf = response_text.decode("utf-8")
+            response_utf = response_utf.replace("=\"/assets/\"", "=\"https://discord.com/assets/\"")
+            response_text = response_utf.encode("utf-8")
+        except Exception as e:
+            #print("ignoring ", str(e))
+            pass
+        res_headers = [{ "name": k, "value": v } for k, v in response.headers.items()]
+        b64 = b64encode(response_text).decode()
+        await tab.fulfill_request(request_id, response.status, res_headers, b64)
     except Exception as e:
-        #print("ignoring ", str(e))
-        pass
-    res_headers = [{ "name": k, "value": v } for k, v in response.headers.items()]
-    b64 = b64encode(response_text).decode()
-    await tab.fulfill_request(request_id, response.status, res_headers, b64)
-
+        logger.error(f"Error on paused request: {url} | {e}")
 
 async def process_fetch(tab):
     try:

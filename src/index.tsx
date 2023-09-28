@@ -33,6 +33,7 @@ class DeckcordEvent extends Event {
 }
 declare global {
   interface Window {
+    DISCORD_TAB: any,
     DECKCORD: {
       setState: any,
       appLifetimeUnregister: any,
@@ -42,14 +43,14 @@ declare global {
   }
 }
 
-function urlContentToDataUri(url: string){
-  return  fetch(url)
-          .then( response => response.blob() )
-          .then( blob => new Promise( callback =>{
-              let reader = new FileReader() ;
-              reader.onload = function(){ callback(this.result) } ;
-              reader.readAsDataURL(blob) ;
-          }) ) ;
+function urlContentToDataUri(url: string) {
+  return fetch(url)
+    .then(response => response.blob())
+    .then(blob => new Promise(callback => {
+      let reader = new FileReader();
+      reader.onload = function () { callback(this.result) };
+      reader.readAsDataURL(blob);
+    }));
 }
 
 const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serverAPI, evtTarget }) => {
@@ -140,14 +141,20 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
           rgOptions={channels}
           onChange={(e) => {
             setChannel(e.data);
-            if (window.location.pathname == "/routes/discord") serverAPI.callPluginMethod("open_discord", {})
+            if (window.location.pathname == "/routes/discord") {
+              window.DISCORD_TAB.m_browserView.SetVisible(true);
+              window.DISCORD_TAB.m_browserView.SetFocus(true);
+            }
           }}
-          onMenuOpened={() => serverAPI.callPluginMethod("close_discord", {})}
+          onMenuOpened={() => {
+            window.DISCORD_TAB.m_browserView.SetVisible(false);
+            window.DISCORD_TAB.m_browserView.SetFocus(false);
+          }}
         ></Dropdown>
-        <DialogButton style={{marginTop: '5px'}} disabled={uploadButtonDisabled} onClick={async () => {
+        <DialogButton style={{ marginTop: '5px' }} disabled={uploadButtonDisabled} onClick={async () => {
           setUploadButtonDisabled(true);
           const data = await urlContentToDataUri(`https://steamloopback.host/${screenshot.strUrl}`);
-          await serverAPI.callPluginMethod("post_screenshot", {channel_id: selectedChannel, data: data});
+          await serverAPI.callPluginMethod("post_screenshot", { channel_id: selectedChannel, data: data });
           setUploadButtonDisabled(false);
         }}>Upload</DialogButton>
       </div>
@@ -166,7 +173,7 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
     )
   }
 
-  if (state?.ready) {
+  if (state?.loaded && state?.logged_in) {
     return (
       <PanelSection>
         <PanelSectionRow>
@@ -203,9 +210,20 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
       </PanelSection>
     );
   }
+  else if (!state?.loaded) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <h2>Initializing...</h2>
+      </div>
+    )
+  }
   else {
     return (
-      <h3>Initializing...</h3>
+      <div style={{ display: "flex", justifyContent: "center", flexDirection: 'column', paddingLeft: '15px' }}>
+        <h2>Not logged in!</h2>
+        <h3>Open <b><FaDiscord />Discord</b> from the Steam Menu and login.</h3>
+        <h4>If you did not logout, just wait for a few seconds.</h4>
+      </div>
     )
   }
 };
@@ -213,7 +231,7 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
 export default definePlugin((serverApi: ServerAPI) => {
   const evtTarget = new _EventTarget();
   const PTT_BUTTON = 33;
-  let unregisterPtt = () => {};
+  let unregisterPtt = () => { };
 
   const setPlaying = () => {
     const app = Router.MainRunningApp;
@@ -229,7 +247,7 @@ export default definePlugin((serverApi: ServerAPI) => {
     pttEnabled: false,
     pttUpdated: () => {
       if (window.DECKCORD.pttEnabled) {
-        serverApi.callPluginMethod("enable_ptt", {enabled: true});
+        serverApi.callPluginMethod("enable_ptt", { enabled: true });
         unregisterPtt = SteamClient.Input.RegisterForControllerInputMessages((events: any) => {
           for (const event of events) {
             if (event.nA == PTT_BUTTON) {
@@ -240,7 +258,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       }
       else {
         unregisterPtt();
-        serverApi.callPluginMethod("enable_ptt", {enabled: false});
+        serverApi.callPluginMethod("enable_ptt", { enabled: false });
       }
     }
   };
@@ -259,7 +277,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       try {
         window.DECKCORD.appLifetimeUnregister();
       }
-      catch (error) {}
+      catch (error) { }
     },
     alwaysRender: true
   };

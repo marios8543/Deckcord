@@ -1,36 +1,16 @@
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function dataURLtoFile(dataurl, filename) {
-    var arr = dataurl.split(','),
-        mime = arr[0].match(/:(.*?);/)[1],
-        bstr = atob(arr[arr.length - 1]),
-        n = bstr.length,
-        u8arr = new Uint8Array(n);
-    while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new File([u8arr], filename, { type: mime });
-}
-
-
 (function () {
-    async function buildReadyObject() {
-        while (true) {
-            const user = Vencord.Webpack.Common.UserStore.getCurrentUser();
-            if (user == undefined) {
-                await sleep(100);
-                continue
-            }
-            return {
-                user: user,
-                mute: Vencord.Webpack.findStore("MediaEngineStore").isSelfMute(),
-                deaf: Vencord.Webpack.findStore("MediaEngineStore").isSelfDeaf()
-            }
+    function dataURLtoFile(dataurl, filename) {
+        var arr = dataurl.split(','),
+            mime = arr[0].match(/:(.*?);/)[1],
+            bstr = atob(arr[arr.length - 1]),
+            n = bstr.length,
+            u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
         }
+        return new File([u8arr], filename, { type: mime });
     }
-
+    
     function patchTypingField() {
         const t = setInterval(() => {
             try {
@@ -43,7 +23,6 @@ function dataURLtoFile(dataurl, filename) {
     let CloudUpload;
     const tt = setInterval(() => {
         CloudUpload = Vencord.Webpack.find(m => m.prototype?.uploadFileToCloud);
-        console.log(CloudUpload);
         if (CloudUpload !== undefined && CloudUpload !== null) clearInterval(tt);
     });
     function sendAttachmentToChannel(channelId, attachment_b64, filename) {
@@ -114,7 +93,7 @@ function dataURLtoFile(dataurl, filename) {
                             }
                             break;
                         case "$get_screen_bounds":
-                            result = {width: screen.width, height: screen.height}
+                            result = { width: screen.width, height: screen.height }
                             break;
                         case "$ptt":
                             try {
@@ -147,7 +126,7 @@ function dataURLtoFile(dataurl, filename) {
                             break;
                     }
                 } catch (error) {
-                    result = {error: error}
+                    result = { error: error }
                     if (data.increment == undefined) return;
                 }
                 const payload = {
@@ -168,19 +147,13 @@ function dataURLtoFile(dataurl, filename) {
             }, 500);
         };
 
-        ws.onopen = async function (ev) {
-            while (true) {
-                try {
-                    const payload = await buildReadyObject();
-                    ws.send(JSON.stringify({
-                        type: "READY",
-                        result: payload
-                    }));
-                    console.log("SENT READY PAYLOAD", payload)
-                    break;
-                } catch (error) { }
-                await sleep(100);
-            }
+        ws.onopen = function (ev) {
+            Vencord.Webpack.waitFor("useState", () => {
+                ws.send(JSON.stringify({
+                    type: "LOADED",
+                    result: true
+                }));
+            });
         }
 
         ws.onerror = function (err) {
@@ -197,17 +170,11 @@ function dataURLtoFile(dataurl, filename) {
             });
             Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().enabled = true;
             Vencord.Webpack.Common.FluxDispatcher.dispatch({ type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true })
-            console.log("MEDIA ENGINE ENABLED");
             if (window.location.pathname == "/login") {
                 for (const el of document.getElementsByTagName('input')) {
                     el.onclick = (ev) => fetch("http://127.0.0.1:65123/openkb", { mode: "no-cors" });
                 }
             }
-            setInterval(() => {
-                try {
-                    ws.send(JSON.stringify({type: "$ping"}));
-                } catch (error) {}
-            }, 5000)
             clearInterval(t);
         }
         catch (err) { }

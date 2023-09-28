@@ -102,9 +102,3 @@ async def setOSK(tab: Tab, state):
         await tab.evaluate("DISCORD_TAB.m_virtualKeyboardHost.m_showKeyboard()")
     else:
         await tab.evaluate("DISCORD_TAB.m_virtualKeyboardHost.m_hideKeyboard()")
-
-async def set_discord_tab_visibility(tab: Tab, visibility):
-    await tab.evaluate(f"""
-        window.DISCORD_TAB.m_browserView.SetVisible({'true' if visibility else 'false'});
-        window.DISCORD_TAB.m_browserView.SetFocus({'true' if visibility else 'false'})
-    """)

@@ -14,7 +14,10 @@ class EventHandler:
         self.state_changed_event = Event()
         self.notification_queue = Queue()
         self.event_handlers = {
-            "READY": self._ready,
+            "LOADED": self._loaded,
+            "CONNECTION_OPEN": self._logged_in,
+            "LOGOUT": self._logout,
+            "CONNECTION_CLOSED": self._logout,
             "VOICE_STATE_UPDATES": self._voice_state_update,
             "VOICE_CHANNEL_SELECT": self._voice_channel_select,
             "AUDIO_TOGGLE_SELF_MUTE": self.toggle_mute,
@@ -22,7 +25,8 @@ class EventHandler:
             "RPC_NOTIFICATION_CREATE": self._notification_create
         }
 
-        self.ready = False
+        self.loaded = False
+        self.logged_in = False
         self.me = User({"id": "", "username": "", "discriminator": None, "avatar": ""})
         self.voicestates = {}
 
@@ -46,7 +50,8 @@ class EventHandler:
 
     def build_state_dict(self):
         r = {
-            "ready": self.ready,
+            "loaded": self.loaded,
+            "logged_in": self.logged_in,
             "me": self.me.to_dict(),
             "vc": {}
         }
@@ -108,12 +113,18 @@ class EventHandler:
                 print_exception(e)
         get_event_loop().create_task(callback(data)).add_done_callback(_)
 
-    async def _ready(self, data):
-        logger.info(f"Received ready event")
-        self.me = User(data["result"]["user"])
-        self.me.is_muted = data["result"]["mute"]
-        self.me.is_deafened = data["result"]["deaf"]
-        self.ready = True
+    async def _loaded(self, data):
+        self.loaded = True
+
+    async def _logged_in(self, data):
+        self.me = User(data["user"])
+        s = await self.api.get_media()
+        self.me.is_muted = s["mute"]
+        self.me.is_deafened = s["deaf"]
+        self.logged_in = True
+    
+    async def _logout(self, data):
+        self.logged_in = False
 
     async def _voice_channel_select(self, data):
         self.vc_channel_id = data["channelId"]
