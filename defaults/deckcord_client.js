@@ -20,11 +20,15 @@
         }, 100)
     }
 
-    let CloudUpload;
+    let CloudUpload, MediaEngineStore;
     const tt = setInterval(() => {
         CloudUpload = Vencord.Webpack.find(m => m.prototype?.uploadFileToCloud);
         if (CloudUpload !== undefined && CloudUpload !== null) clearInterval(tt);
     });
+    const ttt = setInterval(() => {
+        MediaEngineStore = Vencord.Webpack.findStore("MediaEngineStore");
+        if (MediaEngineStore !== undefined && MediaEngineStore !== null) clearInterval(ttt);
+    })
     function sendAttachmentToChannel(channelId, attachment_b64, filename) {
         return new Promise((resolve, reject) => {
             const file = dataURLtoFile(`data:text/plain;base64,${attachment_b64}`, filename);
@@ -77,8 +81,8 @@
                             break;
                         case "$getmedia":
                             result = {
-                                mute: Vencord.Webpack.findStore("MediaEngineStore").isSelfMute(),
-                                deaf: Vencord.Webpack.findStore("MediaEngineStore").isSelfDeaf()
+                                mute: MediaEngineStore.isSelfMute(),
+                                deaf: MediaEngineStore.isSelfDeaf()
                             }
                             break;
                         case "$get_last_channels":
@@ -97,7 +101,7 @@
                             break;
                         case "$ptt":
                             try {
-                                Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().connections.values().next().value.setForceAudioInput(data.value);
+                                MediaEngineStore.getMediaEngine().connections.values().next().value.setForceAudioInput(data.value);
                             } catch (error) { }
                             return;
                         case "$setptt":
@@ -105,7 +109,7 @@
                                 "type": "AUDIO_SET_MODE",
                                 "context": "default",
                                 "mode": data.enabled ? "PUSH_TO_TALK" : "VOICE_ACTIVITY",
-                                "options": Vencord.Webpack.findStore("MediaEngineStore").getSettings().modeOptions
+                                "options": MediaEngineStore.getSettings().modeOptions
                             });
                             return;
                         case "$rpc":
@@ -168,7 +172,7 @@
                 if (e.type == "CHANNEL_SELECT") patchTypingField();
                 ws.send(JSON.stringify(e));
             });
-            Vencord.Webpack.findStore("MediaEngineStore").getMediaEngine().enabled = true;
+            MediaEngineStore.getMediaEngine().enabled = true;
             Vencord.Webpack.Common.FluxDispatcher.dispatch({ type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true })
             if (window.location.pathname == "/login") {
                 for (const el of document.getElementsByTagName('input')) {
