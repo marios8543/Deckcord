@@ -248,6 +248,10 @@ export default definePlugin((serverApi: ServerAPI) => {
     pttUpdated: () => {
       if (window.DECKCORD.pttEnabled) {
         serverApi.callPluginMethod("enable_ptt", { enabled: true });
+        serverApi.toaster.toast({
+          title: "Push-To-Talk",
+          body: "Hold down the R5 button to talk"
+      });
         unregisterPtt = SteamClient.Input.RegisterForControllerInputMessages((events: any) => {
           for (const event of events) {
             if (event.nA == PTT_BUTTON) {
