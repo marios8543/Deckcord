@@ -193,10 +193,19 @@ class Plugin:
 
     async def post_screenshot(plugin, channel_id, data):
         logger.info("Posting screenshot to " + channel_id)
-        return await Plugin.evt_handler.api.post_screenshot(channel_id, data)
+        r = await Plugin.evt_handler.api.post_screenshot(channel_id, data)
+        if r:
+            return True
+        payload = dumps({
+            'title': "Deckcord",
+            'body': "Error while posting screenshot"
+        })
+        await Plugin.shared_js_tab.ensure_open()
+        await Plugin.shared_js_tab.evaluate(f"DeckyPluginLoader.toaster.toast(JSON.parse('{payload}'));")
 
     async def _unload(*args):
         if hasattr(Plugin, "runner"):
+            await Plugin.runner.shutdown()
             await Plugin.runner.cleanup()
         if hasattr(Plugin, "shared_js_tab"):
             await Plugin.shared_js_tab.ensure_open()
@@ -206,3 +215,4 @@ class Plugin:
                 window.DISCORD_TAB = undefined;
             """)
             await Plugin.shared_js_tab.close_websocket()
+        

@@ -56,6 +56,7 @@
                 });
                 resolve(true);
             });
+            upload.on("error", () => resolve(false))
             upload.upload();
         })
     }
@@ -125,8 +126,7 @@
                             });
                             return;
                         case "$screenshot":
-                            await sendAttachmentToChannel(data.channel_id, data.attachment_b64, "screenshot.jpg");
-                            result = {}
+                            result = await sendAttachmentToChannel(data.channel_id, data.attachment_b64, "screenshot.jpg");
                             break;
                     }
                 } catch (error) {
