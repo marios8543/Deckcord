@@ -10,7 +10,7 @@
         }
         return new File([u8arr], filename, { type: mime });
     }
-    
+
     function patchTypingField() {
         const t = setInterval(() => {
             try {
@@ -18,6 +18,15 @@
                 clearInterval(t);
             } catch (err) { }
         }, 100)
+    }
+
+    async function getAppId(name) {
+        const res = await Vencord.Webpack.Common.RestAPI.get({ url: "/applications/detectable" });
+        if (res.ok) {
+            const item = res.body.filter(e => e.name == name);
+            if (item.length > 0) return item[0].id;
+        }
+        return "0";
     }
 
     let CloudUpload, MediaEngineStore;
@@ -117,10 +126,11 @@
                             Vencord.Webpack.Common.FluxDispatcher.dispatch({
                                 type: "LOCAL_ACTIVITY_UPDATE",
                                 activity: data.game ? {
-                                    "application_id": "0",
-                                    "name": data.game,
-                                    "type": 0,
-                                    "flags": 1
+                                    application_id: await getAppId(data.game),
+                                    name: data.game,
+                                    type: 0,
+                                    flags: 1,
+                                    timestamps: { start: Date.now() }
                                 } : {},
                                 socketId: "CustomRPC",
                             });
