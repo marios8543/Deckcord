@@ -237,7 +237,16 @@ export default definePlugin((serverApi: ServerAPI) => {
     const app = Router.MainRunningApp;
     serverApi.callPluginMethod("set_rpc", { game: app !== undefined ? app?.display_name : null });
   }
-  setPlaying();
+
+  (async () => {
+    while (true) {
+      const state: any = (await serverApi.callPluginMethod("get_state", {})).result;
+      if (state?.loaded && state?.logged_in) {
+        setPlaying();
+      }
+    }
+  })();
+
   window.DECKCORD = {
     setState: (s: any) => evtTarget.dispatchEvent(new DeckcordEvent(s)),
     appLifetimeUnregister: SteamClient.GameSessions.RegisterForAppLifetimeNotifications(async () => {
