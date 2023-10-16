@@ -202,6 +202,9 @@ class Plugin:
         })
         await Plugin.shared_js_tab.ensure_open()
         await Plugin.shared_js_tab.evaluate(f"DeckyPluginLoader.toaster.toast(JSON.parse('{payload}'));")
+    
+    async def get_screen_bounds(plugin):
+        return await plugin.evt_handler.api.get_screen_bounds()
 
     async def _unload(*args):
         if hasattr(Plugin, "runner"):

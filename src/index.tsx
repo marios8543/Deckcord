@@ -37,6 +37,7 @@ declare global {
     DECKCORD: {
       setState: any,
       appLifetimeUnregister: any,
+      settingsChangeUnregister: any,
       pttEnabled: boolean,
       pttUpdated: any
     }
@@ -232,6 +233,7 @@ export default definePlugin((serverApi: ServerAPI) => {
   const evtTarget = new _EventTarget();
   const PTT_BUTTON = 33;
   let unregisterPtt = () => { };
+  let lastDisplayIsExternal = false;
 
   const setPlaying = () => {
     const app = Router.MainRunningApp;
@@ -241,9 +243,27 @@ export default definePlugin((serverApi: ServerAPI) => {
   (async () => {
     while (true) {
       const state: any = (await serverApi.callPluginMethod("get_state", {})).result;
-      if (state?.loaded && state?.logged_in) {
-        setPlaying();
+      if (state?.loaded) {
+        window.DECKCORD.settingsChangeUnregister = SteamClient.Settings.RegisterForSettingsChanges(async (settings: any) => {
+          if (settings.bDisplayIsExternal != lastDisplayIsExternal) {
+            lastDisplayIsExternal = settings.bDisplayIsExternal;
+            const bounds: any = (await serverApi.callPluginMethod("get_screen_bounds", {})).result;
+            window.DISCORD_TAB.HEIGHT = bounds.height;
+            window.DISCORD_TAB.WIDTH = bounds.width;
+            window.DISCORD_TAB.m_browserView.SetBounds(0, 0, bounds.width, bounds.height);
+          }
+        });
+        break;
       }
+      await sleep(100);
+    }
+    while (true) {
+      const state: any = (await serverApi.callPluginMethod("get_state", {})).result;
+      if (state?.logged_in) {
+        setPlaying();
+        break;
+      }
+      await sleep(100);
     }
   })();
 
@@ -253,6 +273,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       await sleep(500);
       setPlaying();
     }).unregister,
+    settingsChangeUnregister: null,
     pttEnabled: false,
     pttUpdated: () => {
       if (window.DECKCORD.pttEnabled) {
@@ -260,7 +281,7 @@ export default definePlugin((serverApi: ServerAPI) => {
         serverApi.toaster.toast({
           title: "Push-To-Talk",
           body: "Hold down the R5 button to talk"
-      });
+        });
         unregisterPtt = SteamClient.Input.RegisterForControllerInputMessages((events: any) => {
           for (const event of events) {
             if (event.nA == PTT_BUTTON) {
@@ -289,6 +310,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       unpatchMenu();
       try {
         window.DECKCORD.appLifetimeUnregister();
+        window.DECKCORD.settingsChangeUnregister();
       }
       catch (error) { }
     },

@@ -21,20 +21,22 @@ async def create_discord_tab():
                         window.DISCORD_TAB = undefined;
                     }
                     window.DISCORD_TAB = window.DFL.Router.WindowStore.GamepadUIMainWindowInstance.CreateBrowserView("discord");
-                    window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 495);
+                    window.DISCORD_TAB.WIDTH = 860;
+                    window.DISCORD_TAB.HEIGHT = 495;
+                    window.DISCORD_TAB.m_browserView.SetBounds(0,0, window.DISCORD_TAB.WIDTH, window.DISCORD_TAB.HEIGHT);
                     window.DISCORD_TAB.m_browserView.LoadURL("https://steamloopback.host/discord/init");
                         
                     DFL.Router.WindowStore.GamepadUIMainWindowInstance.m_VirtualKeyboardManager.IsShowingVirtualKeyboard.m_callbacks.m_vecCallbacks.push((e) => {
                         if (!e) {
                             const bounds = window.DISCORD_TAB.m_browserView.GetBounds();
-                            if (bounds.height != 495) {
-                                window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 495);
+                            if (bounds.height != window.DISCORD_TAB.HEIGHT) {
+                                window.DISCORD_TAB.m_browserView.SetBounds(0,0, window.DISCORD_TAB.WIDTH, window.DISCORD_TAB.HEIGHT);
                             }
                         }
                         else {
                             const bounds = window.DISCORD_TAB.m_browserView.GetBounds();
-                            if (bounds.height != 295) {
-                                window.DISCORD_TAB.m_browserView.SetBounds(0,0, 860, 295);
+                            if (bounds.height != window.DISCORD_TAB.HEIGHT * 0.6) {
+                                window.DISCORD_TAB.m_browserView.SetBounds(0,0, window.DISCORD_TAB.WIDTH, window.DISCORD_TAB.HEIGHT * 0.6);
                             }                           
                         }
                     });
