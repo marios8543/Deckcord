@@ -180,7 +180,18 @@
         try {
             Vencord.Webpack.Common.FluxDispatcher.addInterceptor(e => {
                 if (e.type == "CHANNEL_SELECT") patchTypingField();
-                ws.send(JSON.stringify(e));
+                const shouldPass = [
+                    "LOADED",
+                    "CONNECTION_OPEN",
+                    "LOGOUT",
+                    "CONNECTION_CLOSED",
+                    "VOICE_STATE_UPDATES",
+                    "VOICE_CHANNEL_SELECT",
+                    "AUDIO_TOGGLE_SELF_MUTE",
+                    "AUDIO_TOGGLE_SELF_DEAF",
+                    "RPC_NOTIFICATION_CREATE"
+                ].includes(e.type);
+                if (shouldPass) ws.send(JSON.stringify(e));
             });
             MediaEngineStore.getMediaEngine().enabled = true;
             Vencord.Webpack.Common.FluxDispatcher.dispatch({ type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true })

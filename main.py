@@ -101,7 +101,7 @@ class Plugin:
             await sleep(1)
     async def _websocket_handler(request):
         logger.info("Received websocket connection!")
-        ws = WebSocketResponse()
+        ws = WebSocketResponse(max_msg_size=0)
         await ws.prepare(request)
         #Plugin.wd_task = create_task(Plugin.increment_counter())
         #Plugin.wd_task.add_done_callback(lambda _: create_task(Plugin.initialize()))
