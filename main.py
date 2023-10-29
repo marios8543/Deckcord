@@ -89,25 +89,10 @@ class Plugin:
         logger.info("Setting discord visibility to true")
         return "OK"
 
-    WD_SECONDS = 6
-    counter = 0
-    wd_task = None
-    async def increment_counter():
-        while True:
-            if Plugin.counter == Plugin.WD_SECONDS:
-                logger.fatal(f"Did not hear back from the discord tab in {Plugin.WD_SECONDS}. Re-initializing...")
-                return
-            Plugin.counter += 1
-            await sleep(1)
     async def _websocket_handler(request):
         logger.info("Received websocket connection!")
         ws = WebSocketResponse(max_msg_size=0)
         await ws.prepare(request)
-        #Plugin.wd_task = create_task(Plugin.increment_counter())
-        #Plugin.wd_task.add_done_callback(lambda _: create_task(Plugin.initialize()))
-        #async for ping in Plugin.evt_handler.main(ws):
-        #    if ping:
-        #        Plugin.counter = 0
         await Plugin.evt_handler.main(ws)
     
     async def _frontend_evt_dispatcher():

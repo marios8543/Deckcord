@@ -6,7 +6,6 @@ from typing import List
 from aiohttp import ClientSession
 from aiohttp.client_exceptions import ClientConnectorError, ClientOSError
 from asyncio.exceptions import TimeoutError
-from pathlib import Path
 
 BASE_ADDRESS = "http://127.0.0.1:8080"
 

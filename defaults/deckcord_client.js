@@ -1,3 +1,5 @@
+Object.hasOwn = (obj, prop) => obj.hasOwnProperty(prop);
+
 (function () {
     function dataURLtoFile(dataurl, filename) {
         var arr = dataurl.split(','),
@@ -31,7 +33,7 @@
 
     let CloudUpload, MediaEngineStore;
     const tt = setInterval(() => {
-        CloudUpload = Vencord.Webpack.find(m => m.prototype?.uploadFileToCloud);
+        CloudUpload = Vencord.Webpack.findByProps("CloudUpload").CloudUpload;
         if (CloudUpload !== undefined && CloudUpload !== null) clearInterval(tt);
     });
     const ttt = setInterval(() => {

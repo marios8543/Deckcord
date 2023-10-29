@@ -51,7 +51,7 @@ async def create_discord_tab():
 
 async def fetch_vencord():
     async with ClientSession() as session:
-        res = await session.get("https://raw.githubusercontent.com/Vencord/builds/main/Vencord.user.js",
+        res = await session.get("https://raw.githubusercontent.com/Vencord/builds/main/browser.js",
                                 ssl=create_default_context(cafile="/etc/ssl/cert.pem"))
         if res.ok:
             return await res.text()
