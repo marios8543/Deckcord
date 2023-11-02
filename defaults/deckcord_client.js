@@ -16,7 +16,7 @@ Object.hasOwn = (obj, prop) => obj.hasOwnProperty(prop);
     function patchTypingField() {
         const t = setInterval(() => {
             try {
-                document.getElementsByClassName("editor-H2NA06")[0].onclick = (e) => fetch("http://127.0.0.1:65123/openkb", { mode: "no-cors" });
+                document.getElementsByClassName("editor__66464")[0].onclick = (e) => fetch("http://127.0.0.1:65123/openkb", { mode: "no-cors" });
                 clearInterval(t);
             } catch (err) { }
         }, 100)
