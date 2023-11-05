@@ -1,6 +1,6 @@
 from aiohttp.web import Application, get, WebSocketResponse, StreamResponse, route, AppRunner, TCPSite
-from aiohttp import ClientSession
-from asyncio import sleep, ensure_future, create_task
+from aiohttp import ClientResponse, ClientSession, TCPConnector, WSServerHandshakeError
+from asyncio import gather, sleep, ensure_future, create_task
 import aiohttp_cors
 from ssl import create_default_context
 from io import BytesIO
@@ -16,7 +16,7 @@ from tab_utils.tab import create_discord_tab,  \
                           inject_client_to_discord_tab
 from tab_utils.cdp import get_tab
 from discord_client.event_handler import EventHandler
-from proxy import process_fetch
+from proxy import process_fetch, ws_forward
 
 from decky_plugin import logger
 from logging import INFO
@@ -65,6 +65,7 @@ class Plugin:
         Plugin.server.add_routes([
             get("/openkb", Plugin._openkb),
             get("/socket", Plugin._websocket_handler),
+            get("/authws", Plugin._auth_websocket_handler),
             route("PUT", '/deckcord_upload/{tail:.*}', lambda req: Plugin._proxy(req, True)),
             route("*", '/{tail:.*}', Plugin._proxy),
         ])
@@ -94,6 +95,21 @@ class Plugin:
         ws = WebSocketResponse(max_msg_size=0)
         await ws.prepare(request)
         await Plugin.evt_handler.main(ws)
+    
+    async def _auth_websocket_handler(request: ClientResponse):
+        ws = WebSocketResponse(max_msg_size=0)
+        await ws.prepare(request)
+        async with ClientSession(connector=TCPConnector(ssl=True)) as session:
+            headers = {"Origin": "https://discord.com"}
+            try:
+                async with session.ws_connect("wss://remote-auth-gateway.discord.gg/?v=2", headers=headers, 
+                                            ssl=create_default_context(cafile="/etc/ssl/cert.pem")) as target_ws:
+                    await gather(
+                        ws_forward(ws, target_ws),
+                        ws_forward(target_ws, ws)
+                    )
+            except WSServerHandshakeError as e:
+                logger.error(str(e))
     
     async def _frontend_evt_dispatcher():
         async for state in Plugin.evt_handler.yield_new_state():

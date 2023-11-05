@@ -1,5 +1,5 @@
 from logging import getLogger, DEBUG
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientWebSocketResponse
 from base64 import b64encode
 from traceback import format_exc
 from ssl import create_default_context
@@ -72,6 +72,17 @@ async def process_fetch(tab):
                             }
                             return origOpen.call(this, ...args);
                         };
+                                           
+                        const OriginalWebSocket = window.WebSocket;
+                        function PatchedWebSocket(url, protocols) {
+                            let finalUrl = url;
+                            if (url.includes("remote-auth-gateway.discord.gg")) {
+                                finalUrl = 'ws://127.0.0.1:65123/authws';
+                            }
+                            return new OriginalWebSocket(finalUrl, protocols);
+                        }
+                        PatchedWebSocket.prototype = OriginalWebSocket.prototype;
+                        window.WebSocket = PatchedWebSocket;
 
                         document.documentElement.innerHTML = `""" + (await fetch_discord()) + """`;
                         Array.from(document.querySelectorAll("script")).forEach( oldScriptEl => {
@@ -96,4 +107,11 @@ async def process_fetch(tab):
     except Exception as e:
         print("Exception while reading page events " + format_exc())
         await tab.close_websocket()
-        pass
+
+async def ws_forward(src, dest):
+    try:
+        async for message in src:
+            data_to_send = message.data
+            await dest.send_str(data_to_send)
+    except Exception as e:
+        print(f"Error while forwarding: {e}")
