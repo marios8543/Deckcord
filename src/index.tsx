@@ -9,7 +9,8 @@ import {
   Toggle,
   sleep,
   Dropdown,
-  DropdownOption
+  DropdownOption,
+  Focusable
 } from "decky-frontend-lib";
 import { VFC, useEffect, useMemo, useState } from "react";
 import {
@@ -178,13 +179,13 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
     return (
       <PanelSection>
         <PanelSectionRow>
-          <div style={{ display: "flex", justifyContent: "center" }}>
+          <Focusable style={{ display: "flex", justifyContent: "center" }}>
             {muteButton()}
             {deafenButton()}
             <DialogButton onClick={() => { serverAPI.callPluginMethod("disconnect_vc", {}) }}
               style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px' }}
             ><FaPlug /></DialogButton>
-          </div>
+          </Focusable>
         </PanelSectionRow>
         <PanelSectionRow>
           <div style={{ marginTop: '-8px', display: "flex", justifyContent: "center" }}>

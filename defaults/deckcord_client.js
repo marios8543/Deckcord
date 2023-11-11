@@ -194,6 +194,9 @@ Object.hasOwn = (obj, prop) => obj.hasOwnProperty(prop);
                     "RPC_NOTIFICATION_CREATE"
                 ].includes(e.type);
                 if (shouldPass) ws.send(JSON.stringify(e));
+                if (e.type == "CONNECTION_OPEN") {
+                    window.WebSocket = window.OriginalWebsocket;
+                }
             });
             MediaEngineStore.getMediaEngine().enabled = true;
             Vencord.Webpack.Common.FluxDispatcher.dispatch({ type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true })

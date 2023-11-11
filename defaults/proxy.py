@@ -74,6 +74,7 @@ async def process_fetch(tab):
                         };
                                            
                         const OriginalWebSocket = window.WebSocket;
+                        window.OriginalWebsocket = OriginalWebSocket;
                         function PatchedWebSocket(url, protocols) {
                             let finalUrl = url;
                             if (url.includes("remote-auth-gateway.discord.gg")) {
