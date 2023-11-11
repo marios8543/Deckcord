@@ -97,6 +97,7 @@ async def inject_client_to_discord_tab():
         return
     await tab.open_websocket()
     await tab.evaluate(open(Path(__file__).parent.parent.joinpath("deckcord_client.js"), "r").read())
+    await tab.evaluate(open(Path(__file__).parent.parent.joinpath("webrtc_client.js"), "r").read())
     await tab.close_websocket()
 
 async def setOSK(tab: Tab, state):
