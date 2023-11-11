@@ -58,15 +58,9 @@ class WebRTCServer:
         self.remote_ws = None
 
     def start_pipeline(self, create_offer=True, audio_pt=96, video_pt=97):
-        audio_device_output = getoutput("pactl get-default-sink")
-        log.info(f"Audio device output {audio_device_output}")
-        for line in audio_device_output.split("\n"):
-            if "alsa_output" in line:
-                monitor = line + ".monitor"
-                break
-            
+        audio_monitor = getoutput("pactl get-default-sink").splitlines()[0] + ".monitor"
         log.info(f"Creating pipeline, create_offer: {create_offer}")
-        desc = PIPELINE_DESC.format(video_pt=video_pt, audio_pt=audio_pt, monitor=monitor)
+        desc = PIPELINE_DESC.format(video_pt=video_pt, audio_pt=audio_pt, monitor=audio_monitor)
         self.pipe = Gst.parse_launch(desc)
         self.webrtc = self.pipe.get_by_name("send")
         self.webrtc.connect("on-negotiation-needed", self.on_negotiation_needed, create_offer)
