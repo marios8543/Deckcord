@@ -23,7 +23,7 @@ PIPELINE_DESC = """
   queue ! application/x-rtp,media=video,encoding-name=VP8,payload={video_pt} ! send.
   pulsesrc device="Recording_{monitor}" ! audioconvert ! audioresample ! queue ! opusenc ! rtpopuspay !
   queue ! application/x-rtp,media=audio,encoding-name=OPUS,payload={audio_pt} ! send.
-""" 
+"""
 
 def get_payload_types(sdpmsg, video_encoding, audio_encoding):
     video_pt = None
