@@ -85,7 +85,12 @@ async def watchdog(tab: Tab):
         except:
             break
     logger.info("Discord has died. Re-initializing...")
-    await initialize()
+    while True:
+        try:
+            await initialize()
+            break
+        except:
+            await sleep(1)
 
 class Plugin:
     server = Application()
@@ -280,6 +285,12 @@ class Plugin:
 
     async def get_screen_bounds(plugin):
         return await plugin.evt_handler.api.get_screen_bounds()
+    
+    async def go_live(plugin):
+        await plugin.evt_handler.ws.send_json({"type": "$golive", "stop": False})
+
+    async def stop_go_live(plugin):
+        await plugin.evt_handler.ws.send_json({"type": "$golive", "stop": True})
 
     async def _unload(*args):
         if hasattr(Plugin, "webrtc_server"):

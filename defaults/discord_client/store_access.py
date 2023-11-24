@@ -9,6 +9,7 @@ class User:
 
         self.is_muted = False
         self.is_deafened = False
+        self.is_live = False
 
     @classmethod
     def from_vc(self, data):
@@ -31,7 +32,8 @@ class User:
             "username": str(self),
             "avatar": self.avatar,
             "is_muted": self.is_muted,
-            "is_deafened": self.is_deafened
+            "is_deafened": self.is_deafened,
+            "is_live": self.is_live
         }
     
     def __str__(self) -> str:

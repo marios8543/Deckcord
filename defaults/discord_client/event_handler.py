@@ -22,7 +22,9 @@ class EventHandler:
             "VOICE_CHANNEL_SELECT": self._voice_channel_select,
             "AUDIO_TOGGLE_SELF_MUTE": self.toggle_mute,
             "AUDIO_TOGGLE_SELF_DEAF": self.toggle_deafen,
-            "RPC_NOTIFICATION_CREATE": self._notification_create
+            "RPC_NOTIFICATION_CREATE": self._notification_create,
+            "STREAM_STOP": self.toggle_mute,
+            "STREAM_START": self.toggle_mute
         }
 
         self.loaded = False
@@ -70,6 +72,7 @@ class EventHandler:
         r = await self.api.get_media()
         self.me.is_muted = r["mute"]
         self.me.is_deafened = r["deaf"]
+        self.me.is_live = r["live"]
     
     async def toggle_deafen(self, *args, act=False):
         if act:
@@ -77,6 +80,7 @@ class EventHandler:
         r = await self.api.get_media()
         self.me.is_muted = r["mute"]
         self.me.is_deafened = r["deaf"]
+        self.me.is_live = r["live"]
     
     async def disconnect_vc(self):
         await self.ws.send_json({"type":"VOICE_CHANNEL_SELECT","guildId":None,"channelId":None,"currentVoiceChannelId":self.vc_channel_id,"video":False,"stream":False})
@@ -121,6 +125,7 @@ class EventHandler:
         s = await self.api.get_media()
         self.me.is_muted = s["mute"]
         self.me.is_deafened = s["deaf"]
+        self.me.is_live = s["live"]
         self.logged_in = True
     
     async def _logout(self, data):

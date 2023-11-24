@@ -19,7 +19,8 @@ import {
   FaMicrophoneAlt,
   FaHeadphonesAlt,
   FaSlash,
-  FaPlug
+  FaPlug,
+  FaVideo
 } from "react-icons/fa";
 import { patchMenu } from "./menuPatch";
 import { DiscordTab } from "./DiscordTab";
@@ -110,6 +111,26 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
     );
   }
 
+  function goLiveButton() {
+    if (Object.keys(state?.vc).length > 0) {
+      if (!state?.me?.is_live) {
+        return (
+          <DialogButton onClick={() => { serverAPI.callPluginMethod("go_live", {}) }}
+          style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px' }}
+        ><FaVideo /></DialogButton>
+        )
+      }
+      else {
+        return (
+          <DialogButton onClick={() => { serverAPI.callPluginMethod("stop_go_live", {}) }}
+          style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px', backgroundColor: 'red'}}
+        ><FaVideo /></DialogButton>
+        )
+      }
+    }
+    else return (<div></div>)
+  }
+
   function vcChannel() {
     if (state?.vc == undefined) return;
     return (
@@ -184,8 +205,9 @@ const Content: VFC<{ serverAPI: ServerAPI, evtTarget: _EventTarget }> = ({ serve
             {muteButton()}
             {deafenButton()}
             <DialogButton onClick={() => { serverAPI.callPluginMethod("disconnect_vc", {}) }}
-              style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px' }}
+              style={{ height: '40px', width: '40px', minWidth: 0, padding: '10px 12px', marginRight: '10px' }}
             ><FaPlug /></DialogButton>
+            {goLiveButton()}
           </Focusable>
         </PanelSectionRow>
         <PanelSectionRow>

@@ -94,7 +94,8 @@ Object.hasOwn = (obj, prop) => obj.hasOwnProperty(prop);
                         case "$getmedia":
                             result = {
                                 mute: MediaEngineStore.isSelfMute(),
-                                deaf: MediaEngineStore.isSelfDeaf()
+                                deaf: MediaEngineStore.isSelfDeaf(),
+                                live: MediaEngineStore.getGoLiveSource() != undefined
                             }
                             break;
                         case "$get_last_channels":
@@ -140,6 +141,13 @@ Object.hasOwn = (obj, prop) => obj.hasOwnProperty(prop);
                         case "$screenshot":
                             result = await sendAttachmentToChannel(data.channel_id, data.attachment_b64, "screenshot.jpg");
                             break;
+                        case "$golive":
+                            const vc_channel_id = Vencord.Webpack.findStore("SelectedChannelStore").getVoiceChannelId();
+                            if (!vc_channel_id) return;
+                            const vc_guild_id = Vencord.Webpack.Common.ChannelStore.getChannel(vc_channel_id).guild_id;
+                            if (data.stop) Vencord.Webpack.wreq(799808).default(null, null, null);
+                            else Vencord.Webpack.wreq(799808).default(vc_guild_id, vc_channel_id, "Activity Panel");
+                            return;
                     }
                 } catch (error) {
                     result = { error: error }
@@ -191,7 +199,9 @@ Object.hasOwn = (obj, prop) => obj.hasOwnProperty(prop);
                     "VOICE_CHANNEL_SELECT",
                     "AUDIO_TOGGLE_SELF_MUTE",
                     "AUDIO_TOGGLE_SELF_DEAF",
-                    "RPC_NOTIFICATION_CREATE"
+                    "RPC_NOTIFICATION_CREATE",
+                    "STREAM_START",
+                    "STREAM_STOP"
                 ].includes(e.type);
                 if (shouldPass) ws.send(JSON.stringify(e));
                 if (e.type == "CONNECTION_OPEN") {
