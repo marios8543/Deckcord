@@ -1,6 +1,7 @@
 from aiohttp.web import (
     Application,
     get,
+    put,
     WebSocketResponse,
     StreamResponse,
     route,
@@ -27,7 +28,7 @@ from tab_utils.tab import (
     setOSK,
     inject_client_to_discord_tab,
 )
-from tab_utils.cdp import get_tab
+from tab_utils.cdp import Tab, get_tab
 from discord_client.event_handler import EventHandler
 from proxy import process_fetch, ws_forward
 
@@ -47,6 +48,44 @@ async def stream_watcher(stream, is_err=False):
         else:
             logger.info(line)
 
+async def initialize():
+    await create_discord_tab()
+    while True:
+        try:
+            tab = await setup_discord_tab()
+            create_task(process_fetch(tab))
+            create_task(watchdog(tab))
+            break
+        except Exception as e:
+            await sleep(0.1)
+    while True:
+        try:
+            await boot_discord()
+            break
+        except:
+            await sleep(0.1)
+
+    async def _():
+        while True:
+            try:
+                await inject_client_to_discord_tab()
+                break
+            except:
+                await sleep(0.1)
+
+    ensure_future(_())
+
+async def watchdog(tab: Tab):
+    while True:
+        while not tab.websocket.closed:
+            await sleep(1)
+        logger.info("Discord tab websocket is no longer open. Trying to reconnect...")
+        try:
+            await tab.open_websocket()
+        except:
+            break
+    logger.info("Discord has died. Re-initializing...")
+    await initialize()
 
 class Plugin:
     server = Application()
@@ -60,35 +99,9 @@ class Plugin:
     )
     evt_handler = EventHandler()
 
-    async def initialize():
-        await create_discord_tab()
-        while True:
-            try:
-                tab = await setup_discord_tab()
-                create_task(process_fetch(tab))
-                break
-            except Exception as e:
-                await sleep(0.1)
-        while True:
-            try:
-                await boot_discord()
-                break
-            except:
-                await sleep(0.1)
-
-        async def _():
-            while True:
-                try:
-                    await inject_client_to_discord_tab()
-                    break
-                except:
-                    await sleep(0.1)
-
-        ensure_future(_())
-
     async def _main(self):
         logger.info("Starting Deckcord backend")
-        await Plugin.initialize()
+        await initialize()
         logger.info("Discord initialized")
 
         Plugin.server.add_routes(
@@ -96,11 +109,7 @@ class Plugin:
                 get("/openkb", Plugin._openkb),
                 get("/socket", Plugin._websocket_handler),
                 get("/authws", Plugin._auth_websocket_handler),
-                route(
-                    "PUT",
-                    "/deckcord_upload/{tail:.*}",
-                    lambda req: Plugin._proxy(req, True),
-                ),
+                put("/deckcord_upload/{tail:.*}", lambda req: Plugin._proxy(req, True)),
                 route("*", "/{tail:.*}", Plugin._proxy),
             ]
         )

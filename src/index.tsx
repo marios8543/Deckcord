@@ -36,6 +36,7 @@ declare global {
   interface Window {
     DISCORD_TAB: any,
     DECKCORD: {
+      unpatchMenu: any
       setState: any,
       appLifetimeUnregister: any,
       settingsChangeUnregister: any,
@@ -295,10 +296,10 @@ export default definePlugin((serverApi: ServerAPI) => {
         unregisterPtt();
         serverApi.callPluginMethod("enable_ptt", { enabled: false });
       }
-    }
+    },
+    unpatchMenu: patchMenu()
   };
 
-  const unpatchMenu = patchMenu();
   serverApi.routerHook.addRoute("/discord", () => {
     return <DiscordTab serverAPI={serverApi}></DiscordTab>
   });
@@ -308,7 +309,7 @@ export default definePlugin((serverApi: ServerAPI) => {
     content: <Content serverAPI={serverApi} evtTarget={evtTarget} />,
     icon: <FaDiscord />,
     onDismount() {
-      unpatchMenu();
+      window.DECKCORD.unpatchMenu();
       try {
         window.DECKCORD.appLifetimeUnregister();
         window.DECKCORD.settingsChangeUnregister();
