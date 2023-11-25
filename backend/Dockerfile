@@ -9,7 +9,7 @@ gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly \
 gst-plugins-base-libs gst-plugins-bad-libs gst-libav gst-plugin-pipewire \
 faac libnice orc libcdio flac fluidsynth gupnp gupnp-igd gssdp libsrtp nss libvpx openssl
 
-RUN chmod -R 777 /pacman
+RUN rm -rf /pacman/usr/lib/p11-kit-trust.so /pacman/usr/lib/libnssckbi.so
 
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh
