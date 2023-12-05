@@ -12,8 +12,9 @@ interface MainMenuItemProps extends FooterLegendProps {
 }
 
 const reactTree = (document.getElementById('root') as any)._reactRootContainer._internalRoot.current;
+let unpatchMethod: any;
 
-export const patchMenu = () => {
+const _patchMenu = () => {
     const menuNode = findInReactTree(reactTree, (node) => node?.memoizedProps?.navID == 'MainNavMenuContainer')
     if (!menuNode || !menuNode.return?.type) {
         console.log('Menu Patch', 'Failed to find main menu root node.')
@@ -94,7 +95,7 @@ const MenuItemWrapper: FC<MenuItemWrapperProps> = ({ MenuItemComponent, ...props
         ],
         selectedOption: 1,
         onChange: (data: any) => {
-            window.DECKCORD.unpatchMenu();
+            unpatchMethod();
             localStorage.setItem("DECKCORD_MENU_POSITION", data.data);
             patchMenu();
         }
@@ -108,4 +109,9 @@ const MenuItemWrapper: FC<MenuItemWrapperProps> = ({ MenuItemComponent, ...props
             <FaDiscord/>
         </MenuItemComponent>
     )
+}
+
+export const patchMenu = () => {
+    unpatchMethod = _patchMenu()
+    return unpatchMethod;
 }
