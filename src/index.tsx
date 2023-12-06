@@ -27,7 +27,8 @@ declare global {
   interface Window {
     DISCORD_TAB: any;
     DECKCORD: {
-      setState: any
+      setState: any,
+      dispatchNotification: any
     };
   }
 }
@@ -119,6 +120,10 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 export default definePlugin((serverApi: ServerAPI) => {
   let lastState: any;
   window.DECKCORD = {
+    dispatchNotification: (payload: {title:string, body:string}) => {
+      console.log("Dispatching Deckcord notification: ", payload)
+      serverApi.toaster.toast(payload);
+    },
     setState: (state: any) => {
       eventTarget.dispatchEvent(new DeckcordEvent(state));
       lastState = state;

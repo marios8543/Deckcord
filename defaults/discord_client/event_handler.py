@@ -92,10 +92,8 @@ class EventHandler:
         async for msg in self.ws:
             if msg.type == WSMsgType.TEXT:
                 self._process_event(loads(msg.data))
-                #yield True
             elif msg.type == WSMsgType.ERROR:
                 print('ws connection closed with exception %s' % self.ws.exception())
-                #yield False
 
     def _process_event(self, data):
         if data["type"] == "$ping":
@@ -122,11 +120,12 @@ class EventHandler:
 
     async def _logged_in(self, data):
         self.me = User(data["user"])
+        self.logged_in = True
+        
         s = await self.api.get_media()
         self.me.is_muted = s["mute"]
         self.me.is_deafened = s["deaf"]
         self.me.is_live = s["live"]
-        self.logged_in = True
     
     async def _logout(self, data):
         self.logged_in = False

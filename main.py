@@ -44,9 +44,9 @@ async def stream_watcher(stream, is_err=False):
         if not line.strip():
             continue
         if is_err:
-            logger.error(line)
+            logger.debug("ERROR: " + line)
         else:
-            logger.info(line)
+            logger.debug(line)
 
 async def initialize():
     await create_discord_tab()
@@ -193,13 +193,12 @@ class Plugin:
 
     async def _notification_dispatcher():
         async for notification in Plugin.evt_handler.yield_notification():
+            logger.info("DISPATCHING NOTIFICATION")
             payload = dumps(
                 {"title": notification["title"], "body": notification["body"]}
             )
             await Plugin.shared_js_tab.ensure_open()
-            await Plugin.shared_js_tab.evaluate(
-                f"DeckyPluginLoader.toaster.toast(JSON.parse('{payload}'));"
-            )
+            await Plugin.shared_js_tab.evaluate(f"window.DECKCORD.dispatchNotification(JSON.parse('{payload}'));")
 
     async def _proxy(request, is_upload=False):
         req_headers = {k: v for k, v in request.headers.items()}

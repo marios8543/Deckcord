@@ -1,6 +1,8 @@
 Object.hasOwn = (obj, prop) => obj.hasOwnProperty(prop);
 
 (function () {
+    let CloudUpload, MediaEngineStore, ws;
+
     function dataURLtoFile(dataurl, filename) {
         var arr = dataurl.split(','),
             mime = arr[0].match(/:(.*?);/)[1],
@@ -31,15 +33,6 @@ Object.hasOwn = (obj, prop) => obj.hasOwnProperty(prop);
         return "0";
     }
 
-    let CloudUpload, MediaEngineStore;
-    const tt = setInterval(() => {
-        CloudUpload = Vencord.Webpack.findByProps("CloudUpload").CloudUpload;
-        if (CloudUpload !== undefined && CloudUpload !== null) clearInterval(tt);
-    });
-    const ttt = setInterval(() => {
-        MediaEngineStore = Vencord.Webpack.findStore("MediaEngineStore");
-        if (MediaEngineStore !== undefined && MediaEngineStore !== null) clearInterval(ttt);
-    })
     function sendAttachmentToChannel(channelId, attachment_b64, filename) {
         return new Promise((resolve, reject) => {
             const file = dataURLtoFile(`data:text/plain;base64,${attachment_b64}`, filename);
@@ -71,8 +64,24 @@ Object.hasOwn = (obj, prop) => obj.hasOwnProperty(prop);
             upload.upload();
         })
     }
-
-    var ws;
+/*
+    (() => {
+        const t = setInterval(() => {
+            CloudUpload = Vencord.Webpack.findByProps("CloudUpload").CloudUpload;
+            if (CloudUpload !== undefined && CloudUpload !== null) clearInterval(t);
+        })
+    })();
+    (() => {
+        const t = setInterval(() => {
+            MediaEngineStore = Vencord.Webpack.findStore("MediaEngineStore");
+            if (MediaEngineStore !== undefined && MediaEngineStore !== null) {
+                clearInterval(t);
+                MediaEngineStore.getMediaEngine().enabled = true;
+                Vencord.Webpack.Common.FluxDispatcher.dispatch({ type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true });
+            }
+        })
+    })();
+*/
     function connect() {
         ws = new WebSocket('ws://127.0.0.1:65123/socket');
 
@@ -186,30 +195,42 @@ Object.hasOwn = (obj, prop) => obj.hasOwnProperty(prop);
         };
     }
     connect();
-    const t = setInterval(() => {
+
+    (() => {
+        const t = setInterval(() => {
+            try {
+                Vencord.Webpack.Common.FluxDispatcher.addInterceptor(e => {
+                    if (e.type == "CHANNEL_SELECT") patchTypingField();
+                    const shouldPass = [
+                        "LOADED",
+                        "CONNECTION_OPEN",
+                        "LOGOUT",
+                        "CONNECTION_CLOSED",
+                        "VOICE_STATE_UPDATES",
+                        "VOICE_CHANNEL_SELECT",
+                        "AUDIO_TOGGLE_SELF_MUTE",
+                        "AUDIO_TOGGLE_SELF_DEAF",
+                        "RPC_NOTIFICATION_CREATE",
+                        "STREAM_START",
+                        "STREAM_STOP"
+                    ].includes(e.type);
+                    if (shouldPass) {
+                        console.log("Dispatching Deckcord event: ", e);
+                        ws.send(JSON.stringify(e));
+                    }
+                    if (e.type == "CONNECTION_OPEN") {
+                        window.WebSocket = window.OriginalWebsocket;
+                    }
+                });
+                console.log("Deckcord: Added event interceptor");
+                clearInterval(t);
+            }
+            catch (e) {}
+        }, 100);
+    })();
+    (() => {
+        const t = setInterval(() => {
         try {
-            Vencord.Webpack.Common.FluxDispatcher.addInterceptor(e => {
-                if (e.type == "CHANNEL_SELECT") patchTypingField();
-                const shouldPass = [
-                    "LOADED",
-                    "CONNECTION_OPEN",
-                    "LOGOUT",
-                    "CONNECTION_CLOSED",
-                    "VOICE_STATE_UPDATES",
-                    "VOICE_CHANNEL_SELECT",
-                    "AUDIO_TOGGLE_SELF_MUTE",
-                    "AUDIO_TOGGLE_SELF_DEAF",
-                    "RPC_NOTIFICATION_CREATE",
-                    "STREAM_START",
-                    "STREAM_STOP"
-                ].includes(e.type);
-                if (shouldPass) ws.send(JSON.stringify(e));
-                if (e.type == "CONNECTION_OPEN") {
-                    window.WebSocket = window.OriginalWebsocket;
-                }
-            });
-            MediaEngineStore.getMediaEngine().enabled = true;
-            Vencord.Webpack.Common.FluxDispatcher.dispatch({ type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true })
             if (window.location.pathname == "/login") {
                 for (const el of document.getElementsByTagName('input')) {
                     el.onclick = (ev) => fetch("http://127.0.0.1:65123/openkb", { mode: "no-cors" });
@@ -218,5 +239,5 @@ Object.hasOwn = (obj, prop) => obj.hasOwnProperty(prop);
             clearInterval(t);
         }
         catch (err) { }
-    }, 100);
+    }, 100)})();
 })();
