@@ -26,7 +26,6 @@ from tab_utils.tab import (
     setup_discord_tab,
     boot_discord,
     setOSK,
-    inject_client_to_discord_tab,
 )
 from tab_utils.cdp import Tab, get_tab
 from discord_client.event_handler import EventHandler
@@ -64,16 +63,6 @@ async def initialize():
             break
         except:
             await sleep(0.1)
-
-    async def _():
-        while True:
-            try:
-                await inject_client_to_discord_tab()
-                break
-            except:
-                await sleep(0.1)
-
-    ensure_future(_())
 
 async def watchdog(tab: Tab):
     while True:

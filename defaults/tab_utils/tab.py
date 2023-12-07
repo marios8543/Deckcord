@@ -49,12 +49,17 @@ async def create_discord_tab():
             pass
     await tab.close_websocket()
 
+"""
 async def fetch_vencord():
     async with ClientSession() as session:
         res = await session.get("https://raw.githubusercontent.com/Vencord/builds/main/browser.js",
                                 ssl=create_default_context(cafile="/etc/ssl/cert.pem"))
         if res.ok:
             return await res.text()
+"""
+
+async def fetch_vencord():
+    return open(Path(__file__).parent.parent.joinpath("browser.js"), "r").read()
 
 async def setup_discord_tab():
     tab = await get_tab_lambda(lambda tab: tab.url == "https://steamloopback.host/discord/init")
@@ -63,7 +68,11 @@ async def setup_discord_tab():
     await tab._send_devtools_cmd({
         "method": "Page.addScriptToEvaluateOnNewDocument",
         "params": {
-            "source": "window.unsafeWindow = window; " + (await fetch_vencord()),
+            "source": 
+            "Object.hasOwn = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop)" +
+            await fetch_vencord() +
+            open(Path(__file__).parent.parent.joinpath("deckcord_client.js"), "r").read() +
+            open(Path(__file__).parent.parent.joinpath("webrtc_client.js"), "r").read(),
             "runImmediately": True
         }
     })
@@ -89,15 +98,6 @@ async def boot_discord():
             "transitionType": "address_bar"
         }
     })
-    await tab.close_websocket()
-
-async def inject_client_to_discord_tab():
-    tab = next(tab for tab in (await get_tabs()) if "Discord" in tab.title)
-    if not tab:
-        return
-    await tab.open_websocket()
-    await tab.evaluate(open(Path(__file__).parent.parent.joinpath("deckcord_client.js"), "r").read())
-    await tab.evaluate(open(Path(__file__).parent.parent.joinpath("webrtc_client.js"), "r").read())
     await tab.close_websocket()
 
 async def setOSK(tab: Tab, state):
