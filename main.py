@@ -1,18 +1,12 @@
 from aiohttp.web import (
     Application,
     get,
-    put,
     WebSocketResponse,
-    StreamResponse,
-    route,
     AppRunner,
     TCPSite,
 )
-from aiohttp import ClientResponse, ClientSession, TCPConnector, WSServerHandshakeError
-from asyncio import gather, sleep, ensure_future, create_task, create_subprocess_exec
+from asyncio import sleep, create_task, create_subprocess_exec
 import aiohttp_cors
-from ssl import create_default_context
-from io import BytesIO
 from json import dumps
 from pathlib import Path
 from subprocess import PIPE
@@ -29,7 +23,6 @@ from tab_utils.tab import (
 )
 from tab_utils.cdp import Tab, get_tab
 from discord_client.event_handler import EventHandler
-from proxy import process_fetch, ws_forward
 
 from decky_plugin import logger, DECKY_PLUGIN_DIR
 from logging import INFO
@@ -48,21 +41,11 @@ async def stream_watcher(stream, is_err=False):
             logger.debug(line)
 
 async def initialize():
-    await create_discord_tab()
-    while True:
-        try:
-            tab = await setup_discord_tab()
-            create_task(process_fetch(tab))
-            create_task(watchdog(tab))
-            break
-        except Exception as e:
-            await sleep(0.1)
-    while True:
-        try:
-            await boot_discord()
-            break
-        except:
-            await sleep(0.1)
+    tab = await create_discord_tab()
+    await setup_discord_tab(tab)
+    await boot_discord(tab)
+    
+    create_task(watchdog(tab))
 
 async def watchdog(tab: Tab):
     while True:
@@ -71,6 +54,7 @@ async def watchdog(tab: Tab):
         logger.info("Discord tab websocket is no longer open. Trying to reconnect...")
         try:
             await tab.open_websocket()
+            logger.info("Reconnected")
         except:
             break
     logger.info("Discord has died. Re-initializing...")
@@ -102,9 +86,7 @@ class Plugin:
             [
                 get("/openkb", Plugin._openkb),
                 get("/socket", Plugin._websocket_handler),
-                get("/authws", Plugin._auth_websocket_handler),
-                put("/deckcord_upload/{tail:.*}", lambda req: Plugin._proxy(req, True)),
-                route("*", "/{tail:.*}", Plugin._proxy),
+                get("/frontend_socket", Plugin._frontend_socket_handler)
             ]
         )
         for r in list(Plugin.server.router.routes())[:-1]:
@@ -116,7 +98,6 @@ class Plugin:
 
         Plugin.shared_js_tab = await get_tab("SharedJSContext")
         await Plugin.shared_js_tab.open_websocket()
-        create_task(Plugin._frontend_evt_dispatcher())
         create_task(Plugin._notification_dispatcher())
 
         Plugin.webrtc_server = await create_subprocess_exec(
@@ -153,84 +134,31 @@ class Plugin:
         ws = WebSocketResponse(max_msg_size=0)
         await ws.prepare(request)
         await Plugin.evt_handler.main(ws)
+    
 
-    async def _auth_websocket_handler(request: ClientResponse):
+    last_ws: WebSocketResponse = None
+    async def _frontend_socket_handler(request):
+        if Plugin.last_ws:
+            await Plugin.last_ws.close()
+        logger.info("Received frontend websocket connection!")
         ws = WebSocketResponse(max_msg_size=0)
+        Plugin.last_ws = ws
         await ws.prepare(request)
-        async with ClientSession(connector=TCPConnector(ssl=True)) as session:
-            headers = {"Origin": "https://discord.com"}
-            try:
-                async with session.ws_connect(
-                    "wss://remote-auth-gateway.discord.gg/?v=2",
-                    headers=headers,
-                    ssl=create_default_context(cafile="/etc/ssl/cert.pem"),
-                ) as target_ws:
-                    await gather(ws_forward(ws, target_ws), ws_forward(target_ws, ws))
-            except WSServerHandshakeError as e:
-                logger.error(str(e))
-
-    async def _frontend_evt_dispatcher():
         async for state in Plugin.evt_handler.yield_new_state():
-
-            async def _():
-                await Plugin.shared_js_tab.ensure_open()
-                await Plugin.shared_js_tab.evaluate(
-                    f"window.DECKCORD.setState(JSON.parse('{dumps(state)}'));"
-                )
-
-            create_task(_())
+            await ws.send_json(state)
 
     async def _notification_dispatcher():
         async for notification in Plugin.evt_handler.yield_notification():
-            logger.info("DISPATCHING NOTIFICATION")
+            logger.info("Dispatching notification")
             payload = dumps(
                 {"title": notification["title"], "body": notification["body"]}
             )
             await Plugin.shared_js_tab.ensure_open()
             await Plugin.shared_js_tab.evaluate(f"window.DECKCORD.dispatchNotification(JSON.parse('{payload}'));")
-
-    async def _proxy(request, is_upload=False):
-        req_headers = {k: v for k, v in request.headers.items()}
-        req_headers.update(
-            {
-                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
-                "Origin": "https://discord.com",
-                "Referer": "https://discord.com/app",
-                "Host": "discord.com"
-                if not is_upload
-                else "discord-attachments-uploads-prd.storage.googleapis.com",
-            }
-        )
-        async with ClientSession(auto_decompress=False) as session:
-            response = await session.request(
-                request.method,
-                f"https://discord.com/{request.rel_url}"
-                if not is_upload
-                else f"https://discord-attachments-uploads-prd.storage.googleapis.com/{str(request.rel_url).replace('/deckcord_upload/', '')}".strip(),
-                ssl=create_default_context(cafile="/etc/ssl/cert.pem"),
-                headers=req_headers,
-                data=await request.read() if request.has_body else None,
-            )
-            res_headers = {k: v for k, v in response.headers.items()}
-            res_headers.update(
-                {"Access-Control-Allow-Origin": "https://steamloopback.host"}
-            )
-            content = BytesIO(await response.content.read())
-            status = response.status
-            if not response.ok:
-                logger.debug(response.request_info)
-                logger.debug(response)
-                logger.debug(response.status)
-                logger.debug(res_headers)
-            response.close()
-        b = content.read()
-        res = StreamResponse(status=status, headers=res_headers)
-        if is_upload:
-            res.headers.pop("Access-Control-Allow-Origin")
-            res.headers.pop("Access-Control-Expose-Headers")
-        await res.prepare(request)
-        await res.write(b)
-        return res
+    
+    async def connect_ws(*args):
+        await Plugin.shared_js_tab.ensure_open()
+        await Plugin.shared_js_tab.evaluate(f"window.DECKCORD.connectWs()")
 
     async def get_state(*args):
         return Plugin.evt_handler.build_state_dict()
@@ -279,6 +207,9 @@ class Plugin:
 
     async def stop_go_live(plugin):
         await plugin.evt_handler.ws.send_json({"type": "$golive", "stop": True})
+
+    async def mic_webrtc_answer(plugin, answer):
+        await plugin.evt_handler.ws.send_json({"type": "$webrtc", "payload": answer})
 
     async def _unload(*args):
         if hasattr(Plugin, "webrtc_server"):

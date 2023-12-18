@@ -24,7 +24,8 @@ class EventHandler:
             "AUDIO_TOGGLE_SELF_DEAF": self.toggle_deafen,
             "RPC_NOTIFICATION_CREATE": self._notification_create,
             "STREAM_STOP": self.toggle_mute,
-            "STREAM_START": self.toggle_mute
+            "STREAM_START": self.toggle_mute,
+            "$MIC_WEBRTC": self._webrtc_mic_forward,
         }
 
         self.loaded = False
@@ -35,15 +36,14 @@ class EventHandler:
         self.vc_channel_id = ""
         self.vc_channel_name = ""
         self.vc_guild_name = ""
+
+        self.webrtc = None
     
     async def yield_new_state(self):
-        old_dict = {}
         while True:
             await self.state_changed_event.wait()
             dc = self.build_state_dict()
-            if old_dict != dc:
-                yield dc
-                old_dict = dc
+            yield dc
             self.state_changed_event.clear()
     
     async def yield_notification(self):
@@ -51,11 +51,13 @@ class EventHandler:
             yield await self.notification_queue.get()
 
     def build_state_dict(self):
+
         r = {
             "loaded": self.loaded,
             "logged_in": self.logged_in,
             "me": self.me.to_dict(),
-            "vc": {}
+            "vc": {},
+            "webrtc": self.webrtc.copy() if self.webrtc else None
         }
         if self.vc_channel_id:
             r["vc"]["channel_name"] = self.vc_channel_name
@@ -64,6 +66,9 @@ class EventHandler:
             if self.vc_channel_id in self.voicestates:
                 for user in self.voicestates[self.vc_channel_id].values():
                     r["vc"]["users"].append(user.to_dict())
+        
+        if self.webrtc:
+            self.webrtc = None
         return r
 
     async def toggle_mute(self, *args, act=False):
@@ -119,8 +124,8 @@ class EventHandler:
         self.loaded = True
 
     async def _logged_in(self, data):
-        self.me = User(data["user"])
         self.logged_in = True
+        self.me = User(data["user"])
         
         s = await self.api.get_media()
         self.me.is_muted = s["mute"]
@@ -162,3 +167,6 @@ class EventHandler:
     
     async def _notification_create(self, data):
         await self.notification_queue.put(data)
+
+    async def _webrtc_mic_forward(self, data):
+        self.webrtc = data

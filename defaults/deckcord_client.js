@@ -1,12 +1,52 @@
+window.DECKCORD_WS = new WebSocket('ws://127.0.0.1:65123/socket');
+navigator.mediaDevices.getUserMedia = (_) => new Promise(async (resolve, reject) => {
+    if (window.MIC_STREAM != undefined) return resolve(window.MIC_STREAM);
+
+    const peerConnection = new RTCPeerConnection(null);
+    window.MIC_PEER_CONNECTION = peerConnection;
+
+    window.DECKCORD_WS.addEventListener("message", async (e) => {
+        const data = JSON.parse(e.data);
+        console.log(data);
+        if (data.type != "$webrtc") return;
+
+        const remoteDescription = new RTCSessionDescription(data.payload);
+        await peerConnection.setRemoteDescription(remoteDescription);
+    });
+
+    peerConnection.addEventListener("icecandidate", event => {
+        if (event.candidate) {
+            window.DECKCORD_WS.send(JSON.stringify({ type: "$MIC_WEBRTC", ice: event.candidate }));
+        }
+    });
+
+    peerConnection.onaddstream = (ev) => {
+        const stream = ev.stream;
+        console.log("WEBRTC STREAM", stream);
+        window.MIC_STREAM = stream;
+        for (const track of stream.getTracks()) {
+            track.stop = () => { }
+        }
+        resolve(stream);
+    }
+
+    peerConnection.ontrack = (ev) => console.log(ev);
+
+    const offer = await peerConnection.createOffer({ offerToReceiveVideo: false, offerToReceiveAudio: true });
+    await peerConnection.setLocalDescription(offer);
+    window.DECKCORD_WS.send(JSON.stringify({ type: "$MIC_WEBRTC", offer: offer }));
+});
+
 window.Vencord.Plugins.plugins.Deckcord = {
     name: "Deckcord",
     description: "Plugin required for Deckcord to work",
     authors: [],
     required: true,
     async start() {
-        let ws;
-        const MediaEngineStore = Vencord.Webpack.Common.MediaEngineStore;
-        const CloudUpload = Vencord.Webpack.Common.CloudUpload.CloudUpload;
+        console.log("Deckcord: Starting client...");
+
+        const MediaEngineStore = Vencord.Webpack.findStore("MediaEngineStore");
+        const CloudUpload = Vencord.Webpack.findByProps("CloudUpload").CloudUpload;
 
         MediaEngineStore.getMediaEngine().enabled = true;
         Vencord.Webpack.Common.FluxDispatcher.dispatch({ type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true });
@@ -74,9 +114,8 @@ window.Vencord.Plugins.plugins.Deckcord = {
         }
 
         function connect() {
-            ws = new WebSocket('ws://127.0.0.1:65123/socket');
-
-            ws.onmessage = async function (e) {
+            window.DECKCORD_WS = window.DECKCORD_WS || new WebSocket('ws://127.0.0.1:65123/socket');
+            window.DECKCORD_WS.addEventListener("message", async function (e) {
                 const data = JSON.parse(e.data);
                 if (data.type.startsWith("$")) {
                     let result;
@@ -148,6 +187,8 @@ window.Vencord.Plugins.plugins.Deckcord = {
                                 if (data.stop) Vencord.Webpack.wreq(799808).default(null, null, null);
                                 else Vencord.Webpack.wreq(799808).default(vc_guild_id, vc_channel_id, "Activity Panel");
                                 return;
+                            case "$webrtc":
+                                return
                         }
                     } catch (error) {
                         result = { error: error }
@@ -159,58 +200,60 @@ window.Vencord.Plugins.plugins.Deckcord = {
                         result: result || {}
                     };
                     console.debug(data, payload);
-                    ws.send(JSON.stringify(payload));
+                    window.DECKCORD_WS.send(JSON.stringify(payload));
                     return;
                 }
                 Vencord.Webpack.Common.FluxDispatcher.dispatch(data);
-            };
+            });
 
-            ws.onclose = function (e) {
+            window.DECKCORD_WS.onclose = function (e) {
+                Vencord.Webpack.Common.FluxDispatcher._interceptors.pop()
                 setTimeout(function () {
                     connect();
-                }, 500);
+                }, 100);
             };
 
-            ws.onopen = async function (ev) {
-                await Vencord.Webpack.onceReady
-                ws.send(JSON.stringify({
+            window.DECKCORD_WS.onerror = function (err) {
+                console.error('Socket encountered error: ', err.message, 'Closing socket');
+                window.DECKCORD_WS.close();
+            };
+            
+            Vencord.Webpack.waitFor("useState", t =>
+                window.DECKCORD_WS.send(JSON.stringify({
                     type: "LOADED",
                     result: true
-                }));
-            }
+                }))
+            );
 
-            ws.onerror = function (err) {
-                console.error('Socket encountered error: ', err.message, 'Closing socket');
-                ws.close();
-            };
+            Vencord.Webpack.onceReady.then(t =>
+                window.DECKCORD_WS.send(JSON.stringify({
+                    type: "CONNECTION_OPEN",
+                    user: Vencord.Webpack.Common.UserStore.getCurrentUser()
+                }))
+            );
+
+            Vencord.Webpack.Common.FluxDispatcher.addInterceptor(e => {
+                if (e.type == "CHANNEL_SELECT") patchTypingField();
+                const shouldPass = [
+                    "CONNECTION_OPEN",
+                    "LOGOUT",
+                    "CONNECTION_CLOSED",
+                    "VOICE_STATE_UPDATES",
+                    "VOICE_CHANNEL_SELECT",
+                    "AUDIO_TOGGLE_SELF_MUTE",
+                    "AUDIO_TOGGLE_SELF_DEAF",
+                    "RPC_NOTIFICATION_CREATE",
+                    "STREAM_START",
+                    "STREAM_STOP"
+                ].includes(e.type);
+                if (shouldPass) {
+                    console.log("Dispatching Deckcord event: ", e);
+                    window.DECKCORD_WS.send(JSON.stringify(e));
+                }
+            });
+            console.log("Deckcord: Added event interceptor");
         }
         connect();
-
-        await Vencord.Webpack.onceReady
-        Vencord.Webpack.Common.FluxDispatcher.addInterceptor(e => {
-            if (e.type == "CHANNEL_SELECT") patchTypingField();
-            const shouldPass = [
-                "LOADED",
-                "CONNECTION_OPEN",
-                "LOGOUT",
-                "CONNECTION_CLOSED",
-                "VOICE_STATE_UPDATES",
-                "VOICE_CHANNEL_SELECT",
-                "AUDIO_TOGGLE_SELF_MUTE",
-                "AUDIO_TOGGLE_SELF_DEAF",
-                "RPC_NOTIFICATION_CREATE",
-                "STREAM_START",
-                "STREAM_STOP"
-            ].includes(e.type);
-            if (shouldPass) {
-                console.log("Dispatching Deckcord event: ", e);
-                ws.send(JSON.stringify(e));
-            }
-            if (e.type == "CONNECTION_OPEN") {
-                window.WebSocket = window.OriginalWebsocket;
-            }
-        });
-        console.log("Deckcord: Added event interceptor");
 
         (() => {
             const t = setInterval(() => {

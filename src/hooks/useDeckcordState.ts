@@ -11,6 +11,14 @@ export class DeckcordEvent extends Event {
   }
 }
 
+export class WebRTCEvent extends Event {
+  data: any;
+  constructor(d: any) {
+    super("webrtc");
+    this.data = d;
+  }
+}
+
 export const eventTarget = new _EventTarget();
 
 export function useDeckcordState(serverAPI: ServerAPI) {
