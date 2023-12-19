@@ -13,22 +13,32 @@ import { FaDiscord } from "react-icons/fa";
 
 import { patchMenu } from "./patches/menuPatch";
 import { DiscordTab } from "./components/DiscordTab";
-import { useDeckcordState, eventTarget, DeckcordEvent } from "./hooks/useDeckcordState";
+import {
+  useDeckcordState,
+  eventTarget,
+  DeckcordEvent,
+  isLoaded,
+  isLoggedIn,
+  WebRTCEvent,
+} from "./hooks/useDeckcordState";
 
 import { MuteButton } from "./components/buttons/MuteButton";
 import { DeafenButton } from "./components/buttons/DeafenButton";
 import { DisconnectButton } from "./components/buttons/DisconnectButton";
 import { GoLiveButton } from "./components/buttons/GoLiveButton";
 import { PushToTalkButton } from "./components/buttons/PushToTalk";
-import { VoiceChatChannel, VoiceChatMembers } from "./components/VoiceChatViews";
+import {
+  VoiceChatChannel,
+  VoiceChatMembers,
+} from "./components/VoiceChatViews";
 import { UploadScreenshot } from "./components/UploadScreenshot";
 
 declare global {
   interface Window {
     DISCORD_TAB: any;
     DECKCORD: {
-      setState: any,
-      dispatchNotification: any
+      dispatchNotification: any;
+      MIC_PEER_CONNECTION: any;
     };
   }
 }
@@ -118,37 +128,64 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 };
 
 export default definePlugin((serverApi: ServerAPI) => {
-  let lastState: any;
   window.DECKCORD = {
-    dispatchNotification: (payload: {title:string, body:string}) => {
-      console.log("Dispatching Deckcord notification: ", payload)
+    dispatchNotification: (payload: { title: string; body: string }) => {
+      console.log("Dispatching Deckcord notification: ", payload);
       serverApi.toaster.toast(payload);
     },
-    setState: (state: any) => {
-      eventTarget.dispatchEvent(new DeckcordEvent(state));
-      lastState = state;
-    }
-  }
-  serverApi.callPluginMethod("get_state", {}).then((s) => window.DECKCORD.setState(s.result));
+    MIC_PEER_CONNECTION: undefined
+  };
 
-  const isLoaded = () => new Promise((resolve, reject) => {
-    if (lastState?.loaded) return resolve(true);
-    eventTarget.addEventListener("state", (s) => {
-      if ((s as DeckcordEvent).data?.loaded) return resolve(true);
-    })
-  });
-  const isLoggedIn = () => new Promise((resolve, reject) => {
-    if (lastState?.logged_in) return resolve(true);
-    eventTarget.addEventListener("state", (s) => {
-      if ((s as DeckcordEvent).data?.logged_in) return resolve(true);
-    })
+  const setState = (data: any) => {
+    if (data.webrtc) eventTarget.dispatchEvent(new WebRTCEvent(data.webrtc));
+    else eventTarget.dispatchEvent(new DeckcordEvent(data));
+  };
+  serverApi.callPluginMethod("get_state", {}).then((s) => setState(s));
+  let ws;
+  function connect() {
+    ws = new WebSocket("ws://127.0.0.1:65123/frontend_socket");
+    ws.onmessage = (ev) => {
+      const data = JSON.parse(ev.data);
+      setState(data);
+    };
+    ws.onclose = () => setTimeout(() => connect(), 500);
+  }
+  connect();
+
+  let peerConnection: RTCPeerConnection;
+  eventTarget.addEventListener("webrtc", async (ev: any) => {
+    const data = ev.data;
+    console.log(data);
+    if (data.offer) {
+      console.log("Deckcord: Starting RTC connection");
+      if (peerConnection) peerConnection.close();
+      peerConnection = new RTCPeerConnection();
+      window.DECKCORD.MIC_PEER_CONNECTION = peerConnection;
+      const localStream = await navigator.mediaDevices.getUserMedia({video: false, audio: true,});
+      localStream.getTracks().forEach((track) => {
+        peerConnection.addTrack(track, localStream);
+      });
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      console.log("Deckcord: Sending RTC Answer");
+      await serverApi.callPluginMethod("mic_webrtc_answer", { answer: answer });
+    } else if (data.ice) {
+      try {
+        while (peerConnection.remoteDescription == null) await sleep(10);
+        await peerConnection.addIceCandidate(data.ice);
+      } catch (e) {
+        console.error("Deckcord: Error adding received ice candidate", e);
+      }
+    }
   });
 
   let settingsChangeUnregister: any;
-  const appLifetimeUnregister = SteamClient.GameSessions.RegisterForAppLifetimeNotifications(async () => {
-    await sleep(500);
-    setPlaying();
-  }).unregister;
+  const appLifetimeUnregister =
+    SteamClient.GameSessions.RegisterForAppLifetimeNotifications(async () => {
+      await sleep(500);
+      setPlaying();
+    }).unregister;
   const unpatchMenu = patchMenu();
 
   const setPlaying = () => {
@@ -160,9 +197,9 @@ export default definePlugin((serverApi: ServerAPI) => {
 
   let lastDisplayIsExternal = false;
   (async () => {
-    await isLoaded()
-    settingsChangeUnregister =
-    SteamClient.Settings.RegisterForSettingsChanges(
+    await isLoaded();
+    
+    settingsChangeUnregister = SteamClient.Settings.RegisterForSettingsChanges(
       async (settings: any) => {
         if (settings.bDisplayIsExternal != lastDisplayIsExternal) {
           lastDisplayIsExternal = settings.bDisplayIsExternal;

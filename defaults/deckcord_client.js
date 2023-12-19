@@ -1,13 +1,16 @@
 window.DECKCORD_WS = new WebSocket('ws://127.0.0.1:65123/socket');
 navigator.mediaDevices.getUserMedia = (_) => new Promise(async (resolve, reject) => {
-    if (window.MIC_STREAM != undefined) return resolve(window.MIC_STREAM);
+    if (window.MIC_STREAM != undefined && window.MIC_PEER_CONNECTION != undefined && window.MIC_PEER_CONNECTION.connectionState == "connected") {
+        console.log("WebRTC stream available. Returning that.");
+        return resolve(window.MIC_STREAM);
+    }
 
+    console.log("Starting WebRTC handshake for mic stream");
     const peerConnection = new RTCPeerConnection(null);
     window.MIC_PEER_CONNECTION = peerConnection;
 
     window.DECKCORD_WS.addEventListener("message", async (e) => {
         const data = JSON.parse(e.data);
-        console.log(data);
         if (data.type != "$webrtc") return;
 
         const remoteDescription = new RTCSessionDescription(data.payload);
@@ -25,12 +28,15 @@ navigator.mediaDevices.getUserMedia = (_) => new Promise(async (resolve, reject)
         console.log("WEBRTC STREAM", stream);
         window.MIC_STREAM = stream;
         for (const track of stream.getTracks()) {
-            track.stop = () => { }
+            track.stop = () => { console.log("CALLED STOP ON TRACK") }
+            track
         }
         resolve(stream);
     }
 
-    peerConnection.ontrack = (ev) => console.log(ev);
+    peerConnection.ontrack = (ev) => {
+        ev.track.stop = () => { console.log("CALLED STOP ON TRACK") }
+    }
 
     const offer = await peerConnection.createOffer({ offerToReceiveVideo: false, offerToReceiveAudio: true });
     await peerConnection.setLocalDescription(offer);
@@ -47,9 +53,6 @@ window.Vencord.Plugins.plugins.Deckcord = {
 
         const MediaEngineStore = Vencord.Webpack.findStore("MediaEngineStore");
         const CloudUpload = Vencord.Webpack.findByProps("CloudUpload").CloudUpload;
-
-        MediaEngineStore.getMediaEngine().enabled = true;
-        Vencord.Webpack.Common.FluxDispatcher.dispatch({ type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true });
 
         function dataURLtoFile(dataurl, filename) {
             var arr = dataurl.split(','),
@@ -217,7 +220,7 @@ window.Vencord.Plugins.plugins.Deckcord = {
                 console.error('Socket encountered error: ', err.message, 'Closing socket');
                 window.DECKCORD_WS.close();
             };
-            
+
             Vencord.Webpack.waitFor("useState", t =>
                 window.DECKCORD_WS.send(JSON.stringify({
                     type: "LOADED",
@@ -254,6 +257,7 @@ window.Vencord.Plugins.plugins.Deckcord = {
             console.log("Deckcord: Added event interceptor");
         }
         connect();
+        window.navigator.mediaDevices.getUserMedia();
 
         (() => {
             const t = setInterval(() => {

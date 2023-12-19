@@ -20,12 +20,14 @@ export class WebRTCEvent extends Event {
 }
 
 export const eventTarget = new _EventTarget();
+let lastState: any;
 
 export function useDeckcordState(serverAPI: ServerAPI) {
   const [state, setState] = useState<any | undefined>();
-  eventTarget.addEventListener("state", (s) =>
-    setState((s as DeckcordEvent).data)
-  );
+  eventTarget.addEventListener("state", (s) => {
+    setState((s as DeckcordEvent).data);
+    lastState = state;
+  });
 
   useEffect(() => {
     serverAPI.callPluginMethod("get_state", {}).then((s) => setState(s.result));
@@ -34,3 +36,18 @@ export function useDeckcordState(serverAPI: ServerAPI) {
   return state;
 }
 
+export const isLoaded = () =>
+  new Promise((resolve, reject) => {
+    if (lastState?.loaded) return resolve(true);
+    eventTarget.addEventListener("state", (s) => {
+      if ((s as DeckcordEvent).data?.loaded) return resolve(true);
+    });
+  });
+
+export const isLoggedIn = () =>
+  new Promise((resolve, reject) => {
+    if (lastState?.logged_in) return resolve(true);
+    eventTarget.addEventListener("state", (s) => {
+      if ((s as DeckcordEvent).data?.logged_in) return resolve(true);
+    });
+  });

@@ -13,7 +13,7 @@ export function PushToTalkButton(props: { serverAPI: any }) {
         value={pttEnabled}
         onChange={(checked) => {
           setPtt(checked);
-          if (pttEnabled) {
+          if (!pttEnabled) {
             props.serverAPI.callPluginMethod("enable_ptt", { enabled: true });
             props.serverAPI.toaster.toast({
               title: "Push-To-Talk",
