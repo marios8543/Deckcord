@@ -1,6 +1,6 @@
 //Credit: https://github.com/jessebofill/DeckWebBrowser
 
-import { afterPatch, Dropdown, findInReactTree, FooterLegendProps } from "decky-frontend-lib"
+import { afterPatch, Dropdown, findInReactTree, FooterLegendProps, getReactRoot } from "decky-frontend-lib"
 import { FC } from "react"
 import { FaDiscord } from "react-icons/fa"
 
@@ -11,7 +11,7 @@ interface MainMenuItemProps extends FooterLegendProps {
     onActivate?: () => void
 }
 
-const reactTree = (document.getElementById('root') as any)._reactRootContainer._internalRoot.current;
+const reactTree = getReactRoot(document.getElementById('root') as any);
 let unpatchMethod: any;
 
 const _patchMenu = () => {
