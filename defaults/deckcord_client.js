@@ -48,11 +48,13 @@ window.Vencord.Plugins.plugins.Deckcord = {
     description: "Plugin required for Deckcord to work",
     authors: [],
     required: true,
+    startAt: "DOMContentLoaded",
     async start() {
         console.log("Deckcord: Starting client...");
 
-        const MediaEngineStore = Vencord.Webpack.findStore("MediaEngineStore");
-        const CloudUpload = Vencord.Webpack.findByProps("CloudUpload").CloudUpload;
+        let MediaEngineStore, CloudUpload;
+        Vencord.Webpack.waitFor(Vencord.Webpack.filters.byStoreName("MediaEngineStore"), m => MediaEngineStore = m);
+        Vencord.Webpack.waitFor(["CloudUpload"], m => CloudUpload = m.CloudUpload);
 
         function dataURLtoFile(dataurl, filename) {
             var arr = dataurl.split(','),
