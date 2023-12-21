@@ -53,7 +53,10 @@ window.Vencord.Plugins.plugins.Deckcord = {
         console.log("Deckcord: Starting client...");
 
         let MediaEngineStore, CloudUpload;
-        Vencord.Webpack.waitFor(Vencord.Webpack.filters.byStoreName("MediaEngineStore"), m => MediaEngineStore = m);
+        Vencord.Webpack.waitFor(Vencord.Webpack.filters.byStoreName("MediaEngineStore"), m => {
+            MediaEngineStore = m
+            Vencord.Webpack.Common.FluxDispatcher.dispatch({ type: "MEDIA_ENGINE_SET_AUDIO_ENABLED", enabled: true, unmute: true })
+        });
         Vencord.Webpack.waitFor(["CloudUpload"], m => CloudUpload = m.CloudUpload);
 
         function dataURLtoFile(dataurl, filename) {
