@@ -39,6 +39,7 @@ declare global {
     DECKCORD: {
       dispatchNotification: any;
       MIC_PEER_CONNECTION: any;
+      startWatchdog: any;
     };
   }
 }
@@ -133,7 +134,8 @@ export default definePlugin((serverApi: ServerAPI) => {
       console.log("Dispatching Deckcord notification: ", payload);
       serverApi.toaster.toast(payload);
     },
-    MIC_PEER_CONNECTION: undefined
+    MIC_PEER_CONNECTION: undefined,
+    startWatchdog: () => tabWatchdog()
   };
 
   const setState = (data: any) => {
@@ -161,11 +163,16 @@ export default definePlugin((serverApi: ServerAPI) => {
       if (peerConnection) peerConnection.close();
       peerConnection = new RTCPeerConnection();
       window.DECKCORD.MIC_PEER_CONNECTION = peerConnection;
-      const localStream = await navigator.mediaDevices.getUserMedia({video: false, audio: true,});
+      const localStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: true,
+      });
       localStream.getTracks().forEach((track) => {
         peerConnection.addTrack(track, localStream);
       });
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription(data.offer)
+      );
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
       console.log("Deckcord: Sending RTC Answer");
@@ -179,6 +186,16 @@ export default definePlugin((serverApi: ServerAPI) => {
       }
     }
   });
+
+  const tabWatchdog = async () => {
+    while (true) {
+      if (window.DISCORD_TAB == undefined) {
+        await serverApi.callPluginMethod("initialize_tab", {});
+        break;
+      }
+      await sleep(1000);
+    }
+  };
 
   let settingsChangeUnregister: any;
   const appLifetimeUnregister =
@@ -198,7 +215,7 @@ export default definePlugin((serverApi: ServerAPI) => {
   let lastDisplayIsExternal = false;
   (async () => {
     await isLoaded();
-    
+
     settingsChangeUnregister = SteamClient.Settings.RegisterForSettingsChanges(
       async (settings: any) => {
         if (settings.bDisplayIsExternal != lastDisplayIsExternal) {

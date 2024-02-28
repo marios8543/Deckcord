@@ -29,7 +29,6 @@ from logging import INFO
 
 logger.setLevel(INFO)
 
-
 async def stream_watcher(stream, is_err=False):
     async for line in stream:
         line = line.decode("utf-8")
@@ -44,26 +43,9 @@ async def initialize():
     tab = await create_discord_tab()
     await setup_discord_tab(tab)
     await boot_discord(tab)
-    
-    create_task(watchdog(tab))
 
-async def watchdog(tab: Tab):
-    while True:
-        while not tab.websocket.closed:
-            await sleep(1)
-        logger.info("Discord tab websocket is no longer open. Trying to reconnect...")
-        try:
-            await tab.open_websocket()
-            logger.info("Reconnected")
-        except:
-            break
-    logger.info("Discord has died. Re-initializing...")
-    while True:
-        try:
-            await initialize()
-            break
-        except:
-            await sleep(1)
+    await Plugin.shared_js_tab.ensure_open()
+    await Plugin.shared_js_tab.evaluate("window.DECKCORD.startWatchdog()")
 
 class Plugin:
     server = Application()
@@ -134,7 +116,6 @@ class Plugin:
         ws = WebSocketResponse(max_msg_size=0)
         await ws.prepare(request)
         await Plugin.evt_handler.main(ws)
-    
 
     last_ws: WebSocketResponse = None
     async def _frontend_socket_handler(request):
@@ -210,6 +191,11 @@ class Plugin:
 
     async def mic_webrtc_answer(plugin, answer):
         await plugin.evt_handler.ws.send_json({"type": "$webrtc", "payload": answer})
+    
+    async def initialize_tab(plugin):
+        plugin.evt_handler.unload()
+        plugin.evt_handler = None
+        await initialize()
 
     async def _unload(*args):
         if hasattr(Plugin, "webrtc_server"):

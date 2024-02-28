@@ -51,7 +51,6 @@ class EventHandler:
             yield await self.notification_queue.get()
 
     def build_state_dict(self):
-
         r = {
             "loaded": self.loaded,
             "logged_in": self.logged_in,
@@ -170,3 +169,8 @@ class EventHandler:
 
     async def _webrtc_mic_forward(self, data):
         self.webrtc = data
+    
+    async def unload(self):
+        self.loaded = False
+        self.vc_channel_id = ""
+        self.state_changed_event.set()
