@@ -115,7 +115,7 @@ window.Vencord.Plugins.plugins.Deckcord = {
 
         let MediaEngineStore, FluxDispatcher;
         console.log("Deckcord: Waiting for FluxDispatcher...");
-        Vencord.Webpack.waitFor(["dispatch", "subscribe"], fdm => {
+        Vencord.Webpack.waitFor(["subscribe", "dispatch", "register"], fdm => {
             FluxDispatcher = fdm;
             Vencord.Webpack.waitFor(Vencord.Webpack.filters.byStoreName("MediaEngineStore"), m => {
                 MediaEngineStore = m;
