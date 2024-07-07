@@ -80,7 +80,7 @@ window.Vencord.Plugins.plugins.Deckcord = {
         }
 
         let CloudUpload;
-        Vencord.Webpack.waitFor(["CloudUpload"], m => CloudUpload = m.CloudUpload);
+        CloudUpload = Vencord.Webpack.findLazy(m => m.prototype?.trackUploadFinished);;
         function sendAttachmentToChannel(channelId, attachment_b64, filename) {
             return new Promise((resolve, reject) => {
                 const file = dataURLtoFile(`data:text/plain;base64,${attachment_b64}`, filename);
