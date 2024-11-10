@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession # type: ignore
 from .cdp import Tab, get_tab, get_tab_lambda
 from asyncio import sleep
 from ssl import create_default_context
@@ -10,9 +10,12 @@ async def create_discord_tab():
         try:
             tab = await get_tab("SharedJSContext")
             break
+
         except:
             await sleep(0.1)
+
     await tab.open_websocket()
+
     while True:
         await tab.evaluate("""
                     if (window.DISCORD_TAB !== undefined) {
@@ -42,20 +45,26 @@ async def create_discord_tab():
                     });
         """)
         await sleep(3)
+
         try:
             discord_tab = await get_tab_lambda(lambda tab: tab.url == "data:text/plain,to_be_discord")
+
             if discord_tab:
                 await tab.close_websocket()
                 return discord_tab
+
         except:
             pass
+
 
 async def fetch_vencord():
     async with ClientSession() as session:
         res = await session.get("https://raw.githubusercontent.com/Vencord/builds/main/browser.js",
                                 ssl=create_default_context(cafile="/etc/ssl/cert.pem"))
+
         if res.ok:
             return await res.text()
+
 
 async def setup_discord_tab(tab: Tab):
     await tab.open_websocket()
@@ -72,6 +81,7 @@ async def setup_discord_tab(tab: Tab):
         }
     })
 
+
 async def boot_discord(tab: Tab):
     await tab._send_devtools_cmd({
         "method": "Page.navigate",
@@ -80,6 +90,7 @@ async def boot_discord(tab: Tab):
             "transitionType": "address_bar"
         }
     })
+
 
 async def setOSK(tab: Tab, state):
     if state:

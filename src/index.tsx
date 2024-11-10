@@ -2,13 +2,11 @@ import {
   definePlugin,
   PanelSection,
   PanelSectionRow,
-  ServerAPI,
   staticClasses,
   Router,
   sleep,
   Focusable,
-} from "decky-frontend-lib";
-import { VFC } from "react";
+} from "@decky/ui";
 import { FaDiscord } from "react-icons/fa";
 
 import { patchMenu } from "./patches/menuPatch";
@@ -32,6 +30,7 @@ import {
   VoiceChatMembers,
 } from "./components/VoiceChatViews";
 import { UploadScreenshot } from "./components/UploadScreenshot";
+import { call, routerHook, toaster } from "@decky/api";
 
 declare global {
   interface Window {
@@ -43,8 +42,8 @@ declare global {
   }
 }
 
-const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
-  const state = useDeckcordState(serverAPI);
+const Content = () => {
+  const state = useDeckcordState();
   if (!state?.loaded) {
     return (
       <div style={{ display: "flex", justifyContent: "center" }}>
@@ -78,10 +77,10 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       <PanelSection>
         <PanelSectionRow>
           <Focusable style={{ display: "flex", justifyContent: "center" }}>
-            <MuteButton serverAPI={serverAPI}></MuteButton>
-            <DeafenButton serverAPI={serverAPI}></DeafenButton>
-            <DisconnectButton serverAPI={serverAPI}></DisconnectButton>
-            <GoLiveButton serverAPI={serverAPI}></GoLiveButton>
+            <MuteButton />
+            <DeafenButton />
+            <DisconnectButton />
+            <GoLiveButton />
           </Focusable>
         </PanelSectionRow>
         <PanelSectionRow>
@@ -92,7 +91,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
               justifyContent: "center",
             }}
           >
-            <PushToTalkButton serverAPI={serverAPI}></PushToTalkButton>
+            <PushToTalkButton />
           </div>
         </PanelSectionRow>
         <hr></hr>
@@ -115,23 +114,23 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
           </div>
         </PanelSectionRow>
         <PanelSectionRow>
-          <VoiceChatChannel serverAPI={serverAPI}></VoiceChatChannel>
-          <VoiceChatMembers serverAPI={serverAPI}></VoiceChatMembers>
+          <VoiceChatChannel />
+          <VoiceChatMembers />
         </PanelSectionRow>
         <hr></hr>
         <PanelSectionRow>
-          <UploadScreenshot serverAPI={serverAPI}></UploadScreenshot>
+          <UploadScreenshot />
         </PanelSectionRow>
       </PanelSection>
     );
   }
 };
 
-export default definePlugin((serverApi: ServerAPI) => {
+export default definePlugin(() => {
   window.DECKCORD = {
     dispatchNotification: (payload: { title: string; body: string }) => {
       console.log("Dispatching Deckcord notification: ", payload);
-      serverApi.toaster.toast(payload);
+      toaster.toast(payload);
     },
     MIC_PEER_CONNECTION: undefined
   };
@@ -140,7 +139,7 @@ export default definePlugin((serverApi: ServerAPI) => {
     if (data.webrtc) eventTarget.dispatchEvent(new WebRTCEvent(data.webrtc));
     else eventTarget.dispatchEvent(new DeckcordEvent(data));
   };
-  serverApi.callPluginMethod("get_state", {}).then((s) => setState(s));
+  call("get_state").then((s) => setState(s));
   let ws;
   function connect() {
     ws = new WebSocket("ws://127.0.0.1:65123/frontend_socket");
@@ -169,7 +168,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
       console.log("Deckcord: Sending RTC Answer");
-      await serverApi.callPluginMethod("mic_webrtc_answer", { answer: answer });
+      await call("mic_webrtc_answer", answer);
     } else if (data.ice) {
       try {
         while (peerConnection.remoteDescription == null) await sleep(10);
@@ -190,9 +189,7 @@ export default definePlugin((serverApi: ServerAPI) => {
 
   const setPlaying = () => {
     const app = Router.MainRunningApp;
-    serverApi.callPluginMethod("set_rpc", {
-      game: app !== undefined ? app?.display_name : null,
-    });
+    call("set_rpc", app !== undefined ? app?.display_name : null);
   };
 
   let lastDisplayIsExternal = false;
@@ -203,9 +200,7 @@ export default definePlugin((serverApi: ServerAPI) => {
       async (settings: any) => {
         if (settings.bDisplayIsExternal != lastDisplayIsExternal) {
           lastDisplayIsExternal = settings.bDisplayIsExternal;
-          const bounds: any = (
-            await serverApi.callPluginMethod("get_screen_bounds", {})
-          ).result;
+          const bounds: any = await call("get_screen_bounds");
           window.DISCORD_TAB.HEIGHT = bounds.height;
           window.DISCORD_TAB.WIDTH = bounds.width;
           window.DISCORD_TAB.m_browserView.SetBounds(
@@ -221,16 +216,17 @@ export default definePlugin((serverApi: ServerAPI) => {
     setPlaying();
   })();
 
-  serverApi.routerHook.addRoute("/discord", () => {
-    return <DiscordTab serverAPI={serverApi}></DiscordTab>;
+  routerHook.addRoute("/discord", () => {
+    return <DiscordTab />;
   });
 
   return {
     title: <div className={staticClasses.Title}>Deckcord</div>,
-    content: <Content serverAPI={serverApi} />,
+    content: <Content />,
     icon: <FaDiscord />,
     onDismount() {
       unpatchMenu();
+
       try {
         appLifetimeUnregister();
         settingsChangeUnregister();

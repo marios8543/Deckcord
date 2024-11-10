@@ -1,6 +1,7 @@
 {
   "name": "Deckcord",
   "author": "marios8543",
+  "api_version": 1,
   "flags": [],
   "publish": {
     "tags": ["discord", "chat"],

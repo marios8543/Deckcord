@@ -1,14 +1,16 @@
-import { DialogButton, ServerAPI } from "decky-frontend-lib";
+import { DialogButton } from "@decky/ui";
 import { useDeckcordState } from "../../hooks/useDeckcordState";
 import { FaMicrophoneAlt, FaMicrophoneAltSlash } from "react-icons/fa";
+import { call } from "@decky/api";
 
-export function MuteButton(props: { serverAPI: ServerAPI; }) {
-  const state = useDeckcordState(props.serverAPI);
+export function MuteButton() {
+  const state = useDeckcordState();
+
   if (state?.me?.is_muted) {
     return (
       <DialogButton
         onClick={() => {
-          props.serverAPI.callPluginMethod("toggle_mute", {});
+          call("toggle_mute");
         }}
         style={{
           height: "40px",
@@ -25,7 +27,7 @@ export function MuteButton(props: { serverAPI: ServerAPI; }) {
   return (
     <DialogButton
       onClick={() => {
-        props.serverAPI.callPluginMethod("toggle_mute", {});
+        call("toggle_mute");
       }}
       style={{
         height: "40px",

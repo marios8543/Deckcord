@@ -1,9 +1,10 @@
-import { Toggle } from "decky-frontend-lib";
+import { call, toaster } from "@decky/api";
+import { Toggle } from "@decky/ui";
 import { useState } from "react";
 
 const PTT_BUTTON = 33;
 
-export function PushToTalkButton(props: { serverAPI: any }) {
+export function PushToTalkButton() {
   const [pttEnabled, setPtt] = useState<boolean>(false);
   let unregisterPtt: any;
   return (
@@ -14,8 +15,8 @@ export function PushToTalkButton(props: { serverAPI: any }) {
         onChange={(checked) => {
           setPtt(checked);
           if (!pttEnabled) {
-            props.serverAPI.callPluginMethod("enable_ptt", { enabled: true });
-            props.serverAPI.toaster.toast({
+            call("enable_ptt", true);
+            toaster.toast({
               title: "Push-To-Talk",
               body: "Hold down the R5 button to talk",
             });
@@ -24,14 +25,12 @@ export function PushToTalkButton(props: { serverAPI: any }) {
                 (events: any) => {
                   for (const event of events)
                     if (event.nA == PTT_BUTTON)
-                      props.serverAPI.callPluginMethod("set_ptt", {
-                        value: event.bS,
-                      });
+                      call("set_ptt", event.bS);
                 }
               ).unregister;
           } else {
             unregisterPtt();
-            props.serverAPI.callPluginMethod("enable_ptt", { enabled: false });
+            call("enable_ptt", false);
           }
         }}
       ></Toggle>
