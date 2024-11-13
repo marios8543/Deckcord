@@ -6,7 +6,7 @@ export const DiscordTab = () => {
     useLayoutEffect(() => {
         call<[], any>("get_state").then(res => {
             const state = res;
-            if (state?.loaded) {
+            if (state?.loaded && window.DISCORD_TAB) {
                 window.DISCORD_TAB.m_browserView.SetVisible(true);
                 window.DISCORD_TAB.m_browserView.SetFocus(true);
             }
@@ -19,6 +19,9 @@ export const DiscordTab = () => {
             }
         })
         return () => {
+            if (!window.DISCORD_TAB)
+                return;
+
             window.DISCORD_TAB.m_browserView.SetVisible(false);
             window.DISCORD_TAB.m_browserView.SetFocus(false);
         }

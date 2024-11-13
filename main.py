@@ -148,6 +148,7 @@ class Plugin:
         ws = WebSocketResponse(max_msg_size=0)
         await ws.prepare(request)
         await cls.evt_handler.main(ws)
+        return ws
 
     @classmethod
     async def _frontend_socket_handler(cls, request):
@@ -161,6 +162,8 @@ class Plugin:
 
         async for state in cls.evt_handler.yield_new_state():
             await ws.send_json(state)
+
+        return ws
 
     @classmethod
     async def _notification_dispatcher(cls):
