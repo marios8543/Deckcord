@@ -64,7 +64,7 @@ window.Vencord.Plugins.plugins.Deckcord = {
         function patchTypingField() {
             const t = setInterval(() => {
                 try {
-                    document.getElementsByClassName("editor__66464")[0].onclick = (e) => fetch("http://127.0.0.1:65123/openkb", { mode: "no-cors" });
+                    document.querySelectorAll("[role=\"textbox\"]")[0].onclick = (e) => fetch("http://127.0.0.1:65123/openkb", { mode: "no-cors" });
                     clearInterval(t);
                 } catch (err) { }
             }, 100)
