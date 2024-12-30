@@ -1,14 +1,15 @@
-import { DialogButton, ServerAPI } from "decky-frontend-lib";
+import { DialogButton } from "@decky/ui";
 import { useDeckcordState } from "../../hooks/useDeckcordState";
 import { FaHeadphonesAlt, FaSlash } from "react-icons/fa";
+import { call } from "@decky/api";
 
-export function DeafenButton(props: { serverAPI: ServerAPI; }) {
-  const state = useDeckcordState(props.serverAPI);
+export function DeafenButton() {
+  const state = useDeckcordState();
   if (!state?.me?.is_deafened) {
     return (
       <DialogButton
         onClick={() => {
-          props.serverAPI.callPluginMethod("toggle_deafen", {});
+          call("toggle_deafen");
         }}
         style={{
           height: "40px",
@@ -25,7 +26,7 @@ export function DeafenButton(props: { serverAPI: ServerAPI; }) {
   return (
     <DialogButton
       onClick={() => {
-        props.serverAPI.callPluginMethod("toggle_deafen", {});
+        call("toggle_deafen");
       }}
       style={{
         height: "40px",

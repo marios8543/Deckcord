@@ -1,16 +1,20 @@
-import { DialogButton, ServerAPI } from "decky-frontend-lib";
+import { DialogButton } from "@decky/ui";
 import { useDeckcordState } from "../../hooks/useDeckcordState";
 import { FaVideo } from "react-icons/fa";
+import { call } from "@decky/api";
 
-export function GoLiveButton(props: { serverAPI: ServerAPI; }) {
-  const state = useDeckcordState(props.serverAPI);
-  if (state?.vc == null || state?.vc == undefined) return (<div></div>);
+export function GoLiveButton() {
+  const state = useDeckcordState();
+
+  if (state?.vc == null || state?.vc == undefined)
+    return (<div></div>);
+
   if (Object.keys(state?.vc).length > 0) {
     if (!state?.me?.is_live) {
       return (
         <DialogButton
           onClick={() => {
-            props.serverAPI.callPluginMethod("go_live", {});
+            call("go_live");
           }}
           style={{
             height: "40px",
@@ -26,7 +30,7 @@ export function GoLiveButton(props: { serverAPI: ServerAPI; }) {
       return (
         <DialogButton
           onClick={() => {
-            props.serverAPI.callPluginMethod("stop_go_live", {});
+            call("stop_go_live");
           }}
           style={{
             height: "40px",

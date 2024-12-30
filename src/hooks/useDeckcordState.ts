@@ -1,4 +1,4 @@
-import { ServerAPI } from "decky-frontend-lib";
+import { call } from "@decky/api";
 import { useEffect, useState } from "react";
 
 class _EventTarget extends EventTarget {}
@@ -22,7 +22,7 @@ export class WebRTCEvent extends Event {
 export const eventTarget = new _EventTarget();
 let lastState: any;
 
-export function useDeckcordState(serverAPI: ServerAPI) {
+export function useDeckcordState() {
   const [state, setState] = useState<any | undefined>();
   eventTarget.addEventListener("state", (s) => {
     setState((s as DeckcordEvent).data);
@@ -30,14 +30,14 @@ export function useDeckcordState(serverAPI: ServerAPI) {
   });
 
   useEffect(() => {
-    serverAPI.callPluginMethod("get_state", {}).then((s) => setState(s.result));
+    call("get_state").then((s) => setState(s));
   }, []);
 
   return state;
 }
 
 export const isLoaded = () =>
-  new Promise((resolve, reject) => {
+  new Promise((resolve) => {
     if (lastState?.loaded) return resolve(true);
     eventTarget.addEventListener("state", (s) => {
       if ((s as DeckcordEvent).data?.loaded) return resolve(true);
@@ -45,7 +45,7 @@ export const isLoaded = () =>
   });
 
 export const isLoggedIn = () =>
-  new Promise((resolve, reject) => {
+  new Promise((resolve) => {
     if (lastState?.logged_in) return resolve(true);
     eventTarget.addEventListener("state", (s) => {
       if ((s as DeckcordEvent).data?.logged_in) return resolve(true);

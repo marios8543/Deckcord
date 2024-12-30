@@ -1,4 +1,4 @@
-from aiohttp.web import (
+from aiohttp.web import ( # type: ignore
     Application,
     get,
     WebSocketResponse,
@@ -6,14 +6,17 @@ from aiohttp.web import (
     TCPSite,
 )
 from asyncio import sleep, create_task, create_subprocess_exec
-import aiohttp_cors
+import aiohttp_cors # type: ignore
 from json import dumps
 from pathlib import Path
 from subprocess import PIPE
 
-import os, sys
+import sys
 
-sys.path.append(os.path.dirname(__file__))
+from decky import logger, DECKY_PLUGIN_DIR # type: ignore
+from logging import INFO
+
+sys.path.append(DECKY_PLUGIN_DIR)
 
 from tab_utils.tab import (
     create_discord_tab,
@@ -23,9 +26,6 @@ from tab_utils.tab import (
 )
 from tab_utils.cdp import Tab, get_tab
 from discord_client.event_handler import EventHandler
-
-from decky_plugin import logger, DECKY_PLUGIN_DIR
-from logging import INFO
 
 logger.setLevel(INFO)
 
@@ -40,6 +40,7 @@ async def stream_watcher(stream, is_err=False):
         else:
             logger.debug(line)
 
+
 async def initialize():
     tab = await create_discord_tab()
     await setup_discord_tab(tab)
@@ -47,23 +48,31 @@ async def initialize():
     
     create_task(watchdog(tab))
 
+
 async def watchdog(tab: Tab):
     while True:
         while not tab.websocket.closed:
             await sleep(1)
+
         logger.info("Discord tab websocket is no longer open. Trying to reconnect...")
+
         try:
             await tab.open_websocket()
             logger.info("Reconnected")
+
         except:
             break
+
     logger.info("Discord has died. Re-initializing...")
+
     while True:
         try:
             await initialize()
             break
+
         except:
             await sleep(1)
+
 
 class Plugin:
     server = Application()
@@ -76,31 +85,34 @@ class Plugin:
         },
     )
     evt_handler = EventHandler()
+    last_ws: WebSocketResponse = None
 
-    async def _main(self):
+    @classmethod
+    async def _main(cls):
         logger.info("Starting Deckcord backend")
         await initialize()
         logger.info("Discord initialized")
 
-        Plugin.server.add_routes(
+        cls.server.add_routes(
             [
-                get("/openkb", Plugin._openkb),
-                get("/socket", Plugin._websocket_handler),
-                get("/frontend_socket", Plugin._frontend_socket_handler)
+                get("/openkb", cls._openkb),
+                get("/socket", cls._websocket_handler),
+                get("/frontend_socket", cls._frontend_socket_handler)
             ]
         )
-        for r in list(Plugin.server.router.routes())[:-1]:
-            Plugin.cors.add(r)
-        Plugin.runner = AppRunner(Plugin.server, access_log=None)
-        await Plugin.runner.setup()
+        for r in list(cls.server.router.routes())[:-1]:
+            cls.cors.add(r)
+
+        cls.runner = AppRunner(cls.server, access_log=None)
+        await cls.runner.setup()
         logger.info("Starting server.")
-        await TCPSite(Plugin.runner, "0.0.0.0", 65123).start()
+        await TCPSite(cls.runner, "0.0.0.0", 65123).start()
 
-        Plugin.shared_js_tab = await get_tab("SharedJSContext")
-        await Plugin.shared_js_tab.open_websocket()
-        create_task(Plugin._notification_dispatcher())
+        cls.shared_js_tab = await get_tab("SharedJSContext")
+        await cls.shared_js_tab.open_websocket()
+        create_task(cls._notification_dispatcher())
 
-        Plugin.webrtc_server = await create_subprocess_exec(
+        cls.webrtc_server = await create_subprocess_exec(
             "/usr/bin/python",
             str(Path(DECKY_PLUGIN_DIR) / "gst_webrtc.py"),
             env={
@@ -117,114 +129,140 @@ class Plugin:
             stdout=PIPE,
             stderr=PIPE,
         )
-        create_task(stream_watcher(Plugin.webrtc_server.stdout))
-        create_task(stream_watcher(Plugin.webrtc_server.stderr, True))
+        create_task(stream_watcher(cls.webrtc_server.stdout))
+        create_task(stream_watcher(cls.webrtc_server.stderr, True))
 
         while True:
             await sleep(3600)
 
-    async def _openkb(request):
-        await Plugin.shared_js_tab.ensure_open()
-        await setOSK(Plugin.shared_js_tab, True)
+    @classmethod
+    async def _openkb(cls, request):
+        await cls.shared_js_tab.ensure_open()
+        await setOSK(cls.shared_js_tab, True)
         logger.info("Setting discord visibility to true")
         return "OK"
 
-    async def _websocket_handler(request):
+    @classmethod
+    async def _websocket_handler(cls, request):
         logger.info("Received websocket connection!")
         ws = WebSocketResponse(max_msg_size=0)
         await ws.prepare(request)
-        await Plugin.evt_handler.main(ws)
-    
+        await cls.evt_handler.main(ws)
+        return ws
 
-    last_ws: WebSocketResponse = None
-    async def _frontend_socket_handler(request):
-        if Plugin.last_ws:
-            await Plugin.last_ws.close()
+    @classmethod
+    async def _frontend_socket_handler(cls, request):
+        if cls.last_ws:
+            await cls.last_ws.close()
+
         logger.info("Received frontend websocket connection!")
         ws = WebSocketResponse(max_msg_size=0)
-        Plugin.last_ws = ws
+        cls.last_ws = ws
         await ws.prepare(request)
-        async for state in Plugin.evt_handler.yield_new_state():
+
+        async for state in cls.evt_handler.yield_new_state():
             await ws.send_json(state)
 
-    async def _notification_dispatcher():
-        async for notification in Plugin.evt_handler.yield_notification():
+        return ws
+
+    @classmethod
+    async def _notification_dispatcher(cls):
+        async for notification in cls.evt_handler.yield_notification():
             logger.info("Dispatching notification")
             payload = dumps(
                 {"title": notification["title"], "body": notification["body"]}
             )
-            await Plugin.shared_js_tab.ensure_open()
-            await Plugin.shared_js_tab.evaluate(f"window.DECKCORD.dispatchNotification(JSON.parse('{payload}'));")
-    
-    async def connect_ws(*args):
-        await Plugin.shared_js_tab.ensure_open()
-        await Plugin.shared_js_tab.evaluate(f"window.DECKCORD.connectWs()")
+            await cls.shared_js_tab.ensure_open()
+            await cls.shared_js_tab.evaluate(f"window.DECKCORD.dispatchNotification(JSON.parse('{payload}'));")
 
-    async def get_state(*args):
-        return Plugin.evt_handler.build_state_dict()
+    @classmethod
+    async def connect_ws(cls):
+        await cls.shared_js_tab.ensure_open()
+        await cls.shared_js_tab.evaluate(f"window.DECKCORD.connectWs()")
 
-    async def toggle_mute(*args):
+    @classmethod
+    async def get_state(cls):
+        return cls.evt_handler.build_state_dict()
+
+    @classmethod
+    async def toggle_mute(cls):
         logger.info("Toggling mute")
-        return await Plugin.evt_handler.toggle_mute(act=True)
+        return await cls.evt_handler.toggle_mute(act=True)
 
-    async def toggle_deafen(*args):
+    @classmethod
+    async def toggle_deafen(cls):
         logger.info("Toggling deafen")
-        return await Plugin.evt_handler.toggle_deafen(act=True)
+        return await cls.evt_handler.toggle_deafen(act=True)
 
-    async def disconnect_vc(*args):
+    @classmethod
+    async def disconnect_vc(cls):
         logger.info("Disconnecting vc")
-        return await Plugin.evt_handler.disconnect_vc()
+        return await cls.evt_handler.disconnect_vc()
 
-    async def set_ptt(plugin, value):
-        await Plugin.evt_handler.ws.send_json({"type": "$ptt", "value": value})
+    @classmethod
+    async def set_ptt(cls, value):
+        await cls.evt_handler.ws.send_json({"type": "$ptt", "value": value})
 
-    async def enable_ptt(plugin, enabled):
-        await Plugin.evt_handler.ws.send_json({"type": "$setptt", "enabled": enabled})
+    @classmethod
+    async def enable_ptt(cls, enabled):
+        await cls.evt_handler.ws.send_json({"type": "$setptt", "enabled": enabled})
 
-    async def set_rpc(plugin, game):
+    @classmethod
+    async def set_rpc(cls, game):
         logger.info("Setting RPC")
-        await Plugin.evt_handler.ws.send_json({"type": "$rpc", "game": game})
+        await cls.evt_handler.ws.send_json({"type": "$rpc", "game": game})
 
-    async def get_last_channels(plugin):
-        return await plugin.evt_handler.api.get_last_channels()
+    @classmethod
+    async def get_last_channels(cls):
+        return await cls.evt_handler.api.get_last_channels()
 
-    async def post_screenshot(plugin, channel_id, data):
+    @classmethod
+    async def post_screenshot(cls, channel_id, data):
         logger.info("Posting screenshot to " + channel_id)
-        r = await Plugin.evt_handler.api.post_screenshot(channel_id, data)
+        r = await cls.evt_handler.api.post_screenshot(channel_id, data)
+
         if r:
             return True
+
         payload = dumps({"title": "Deckcord", "body": "Error while posting screenshot"})
-        await Plugin.shared_js_tab.ensure_open()
-        await Plugin.shared_js_tab.evaluate(
+        await cls.shared_js_tab.ensure_open()
+        await cls.shared_js_tab.evaluate(
             f"DeckyPluginLoader.toaster.toast(JSON.parse('{payload}'));"
         )
 
-    async def get_screen_bounds(plugin):
-        return await plugin.evt_handler.api.get_screen_bounds()
-    
-    async def go_live(plugin):
-        await plugin.evt_handler.ws.send_json({"type": "$golive", "stop": False})
+    @classmethod
+    async def get_screen_bounds(cls):
+        return await cls.evt_handler.api.get_screen_bounds()
 
-    async def stop_go_live(plugin):
-        await plugin.evt_handler.ws.send_json({"type": "$golive", "stop": True})
+    @classmethod
+    async def go_live(cls):
+        await cls.evt_handler.ws.send_json({"type": "$golive", "stop": False})
 
-    async def mic_webrtc_answer(plugin, answer):
-        await plugin.evt_handler.ws.send_json({"type": "$webrtc", "payload": answer})
+    @classmethod
+    async def stop_go_live(cls):
+        await cls.evt_handler.ws.send_json({"type": "$golive", "stop": True})
 
-    async def _unload(*args):
-        if hasattr(Plugin, "webrtc_server"):
-            Plugin.webrtc_server.kill()
-            await Plugin.webrtc_server.wait()
-        if hasattr(Plugin, "runner"):
-            await Plugin.runner.shutdown()
-            await Plugin.runner.cleanup()
-        if hasattr(Plugin, "shared_js_tab"):
-            await Plugin.shared_js_tab.ensure_open()
-            await Plugin.shared_js_tab.evaluate(
+    @classmethod
+    async def mic_webrtc_answer(cls, answer):
+        await cls.evt_handler.ws.send_json({"type": "$webrtc", "payload": answer})
+
+    @classmethod
+    async def _unload(cls):
+        if hasattr(cls, "webrtc_server"):
+            cls.webrtc_server.kill()
+            await cls.webrtc_server.wait()
+
+        if hasattr(cls, "runner"):
+            await cls.runner.shutdown()
+            await cls.runner.cleanup()
+
+        if hasattr(cls, "shared_js_tab"):
+            await cls.shared_js_tab.ensure_open()
+            await cls.shared_js_tab.evaluate(
                 """
                 window.DISCORD_TAB.m_browserView.SetVisible(false);
                 window.DISCORD_TAB.Destroy();
                 window.DISCORD_TAB = undefined;
             """
             )
-            await Plugin.shared_js_tab.close_websocket()
+            await cls.shared_js_tab.close_websocket()
