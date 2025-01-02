@@ -1,36 +1,21 @@
-import { call } from "@decky/api";
+import { call, addEventListener, removeEventListener } from "@decky/api";
 import { useEffect, useState } from "react";
-
-class _EventTarget extends EventTarget {}
-
-export class DeckcordEvent extends Event {
-  data: any;
-  constructor(d: any) {
-    super("state");
-    this.data = d;
-  }
-}
-
-export class WebRTCEvent extends Event {
-  data: any;
-  constructor(d: any) {
-    super("webrtc");
-    this.data = d;
-  }
-}
-
-export const eventTarget = new _EventTarget();
-let lastState: any;
 
 export function useDeckcordState() {
   const [state, setState] = useState<any | undefined>();
-  eventTarget.addEventListener("state", (s) => {
-    setState((s as DeckcordEvent).data);
-    lastState = state;
-  });
 
   useEffect(() => {
     call("get_state").then((s) => setState(s));
+
+    addEventListener("state", (data: any) => {
+      setState(data);
+    });
+
+    return () => {
+      removeEventListener("state", (data: any) => {
+        setState(data);
+      });
+    };
   }, []);
 
   return state;
@@ -38,16 +23,30 @@ export function useDeckcordState() {
 
 export const isLoaded = () =>
   new Promise((resolve) => {
-    if (lastState?.loaded) return resolve(true);
-    eventTarget.addEventListener("state", (s) => {
-      if ((s as DeckcordEvent).data?.loaded) return resolve(true);
+    call("get_state").then((s: any) => {
+      if (s.loaded) resolve(true);
     });
+
+    const listener = (s: any) => {
+      if (s.loaded) {
+        removeEventListener("state", listener);
+        return resolve(true);
+      }
+    };
+    addEventListener("state", listener);
   });
 
 export const isLoggedIn = () =>
   new Promise((resolve) => {
-    if (lastState?.logged_in) return resolve(true);
-    eventTarget.addEventListener("state", (s) => {
-      if ((s as DeckcordEvent).data?.logged_in) return resolve(true);
+    call("get_state").then((s: any) => {
+      if (s.logged_in) resolve(true);
     });
+
+    const listener = (s: any) => {
+      if (s.logged_in) {
+        removeEventListener("state", listener);
+        return resolve(true);
+      }
+    };
+    addEventListener("state", listener);
   });

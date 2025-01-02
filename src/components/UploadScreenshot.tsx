@@ -31,9 +31,12 @@ export function UploadScreenshot() {
           return;
 
         const channelList = res;
-
-        for (const channelId in channelList)
+        console.log(channelList);
+        for (const channelId in channelList) {
+          console.log(channelId);
           channels.push({ data: channelId, label: channelList[channelId] });
+        }
+          
 
         setChannel(channels[0].data);
       });

@@ -1,4 +1,4 @@
-from aiohttp.web import ( # type: ignore
+from aiohttp.web import (  # type: ignore
     Application,
     get,
     WebSocketResponse,
@@ -6,14 +6,14 @@ from aiohttp.web import ( # type: ignore
     TCPSite,
 )
 from asyncio import sleep, create_task, create_subprocess_exec
-import aiohttp_cors # type: ignore
+import aiohttp_cors  # type: ignore
 from json import dumps
 from pathlib import Path
 from subprocess import PIPE
 
 import sys
 
-from decky import logger, DECKY_PLUGIN_DIR # type: ignore
+from decky import logger, DECKY_PLUGIN_DIR, emit  # type: ignore
 from logging import INFO
 
 sys.path.append(DECKY_PLUGIN_DIR)
@@ -45,7 +45,7 @@ async def initialize():
     tab = await create_discord_tab()
     await setup_discord_tab(tab)
     await boot_discord(tab)
-    
+
     create_task(watchdog(tab))
 
 
@@ -96,8 +96,7 @@ class Plugin:
         cls.server.add_routes(
             [
                 get("/openkb", cls._openkb),
-                get("/socket", cls._websocket_handler),
-                get("/frontend_socket", cls._frontend_socket_handler)
+                get("/socket", cls._websocket_handler)
             ]
         )
         for r in list(cls.server.router.routes())[:-1]:
@@ -132,8 +131,8 @@ class Plugin:
         create_task(stream_watcher(cls.webrtc_server.stdout))
         create_task(stream_watcher(cls.webrtc_server.stderr, True))
 
-        while True:
-            await sleep(3600)
+        async for state in cls.evt_handler.yield_new_state():
+            await emit("state", state)
 
     @classmethod
     async def _openkb(cls, request):
@@ -151,21 +150,6 @@ class Plugin:
         return ws
 
     @classmethod
-    async def _frontend_socket_handler(cls, request):
-        if cls.last_ws:
-            await cls.last_ws.close()
-
-        logger.info("Received frontend websocket connection!")
-        ws = WebSocketResponse(max_msg_size=0)
-        cls.last_ws = ws
-        await ws.prepare(request)
-
-        async for state in cls.evt_handler.yield_new_state():
-            await ws.send_json(state)
-
-        return ws
-
-    @classmethod
     async def _notification_dispatcher(cls):
         async for notification in cls.evt_handler.yield_notification():
             logger.info("Dispatching notification")
@@ -173,7 +157,9 @@ class Plugin:
                 {"title": notification["title"], "body": notification["body"]}
             )
             await cls.shared_js_tab.ensure_open()
-            await cls.shared_js_tab.evaluate(f"window.DECKCORD.dispatchNotification(JSON.parse('{payload}'));")
+            await cls.shared_js_tab.evaluate(
+                f"window.DECKCORD.dispatchNotification(JSON.parse('{payload}'));"
+            )
 
     @classmethod
     async def connect_ws(cls):

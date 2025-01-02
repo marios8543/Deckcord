@@ -13,11 +13,8 @@ import { patchMenu } from "./patches/menuPatch";
 import { DiscordTab } from "./components/DiscordTab";
 import {
   useDeckcordState,
-  eventTarget,
-  DeckcordEvent,
   isLoaded,
   isLoggedIn,
-  WebRTCEvent,
 } from "./hooks/useDeckcordState";
 
 import { MuteButton } from "./components/buttons/MuteButton";
@@ -30,7 +27,13 @@ import {
   VoiceChatMembers,
 } from "./components/VoiceChatViews";
 import { UploadScreenshot } from "./components/UploadScreenshot";
-import { call, routerHook, toaster } from "@decky/api";
+import {
+  call,
+  routerHook,
+  toaster,
+  addEventListener,
+  removeEventListener,
+} from "@decky/api";
 
 declare global {
   interface Window {
@@ -132,39 +135,33 @@ export default definePlugin(() => {
       console.log("Dispatching Deckcord notification: ", payload);
       toaster.toast(payload);
     },
-    MIC_PEER_CONNECTION: undefined
+    MIC_PEER_CONNECTION: undefined,
   };
-
-  const setState = (data: any) => {
-    if (data.webrtc) eventTarget.dispatchEvent(new WebRTCEvent(data.webrtc));
-    else eventTarget.dispatchEvent(new DeckcordEvent(data));
-  };
-  call("get_state").then((s) => setState(s));
-  let ws;
-  function connect() {
-    ws = new WebSocket("ws://127.0.0.1:65123/frontend_socket");
-    ws.onmessage = (ev) => {
-      const data = JSON.parse(ev.data);
-      setState(data);
-    };
-    ws.onclose = () => setTimeout(() => connect(), 500);
-  }
-  connect();
 
   let peerConnection: RTCPeerConnection;
-  eventTarget.addEventListener("webrtc", async (ev: any) => {
-    const data = ev.data;
+  const webrtcEventListener = async (data: any) => {
+    if (!data.webrtc) return;
+    data = data.webrtc;
     console.log(data);
     if (data.offer) {
       console.log("Deckcord: Starting RTC connection");
       if (peerConnection) peerConnection.close();
       peerConnection = new RTCPeerConnection();
       window.DECKCORD.MIC_PEER_CONNECTION = peerConnection;
-      const localStream = await navigator.mediaDevices.getUserMedia({video: false, audio: true,});
+      const localStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        },
+      });
       localStream.getTracks().forEach((track) => {
         peerConnection.addTrack(track, localStream);
       });
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription(data.offer)
+      );
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
       console.log("Deckcord: Sending RTC Answer");
@@ -177,7 +174,8 @@ export default definePlugin(() => {
         console.error("Deckcord: Error adding received ice candidate", e);
       }
     }
-  });
+  };
+  addEventListener("state", webrtcEventListener);
 
   let settingsChangeUnregister: any;
   const appLifetimeUnregister =
@@ -195,7 +193,7 @@ export default definePlugin(() => {
   let lastDisplayIsExternal = false;
   (async () => {
     await isLoaded();
-    
+
     settingsChangeUnregister = SteamClient.Settings.RegisterForSettingsChanges(
       async (settings: any) => {
         if (settings.bDisplayIsExternal != lastDisplayIsExternal) {
@@ -226,7 +224,7 @@ export default definePlugin(() => {
     icon: <FaDiscord />,
     onDismount() {
       unpatchMenu();
-
+      removeEventListener("webrtc", webrtcEventListener);
       try {
         appLifetimeUnregister();
         settingsChangeUnregister();
