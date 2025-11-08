@@ -1,24 +1,25 @@
 //Credit: https://github.com/jessebofill/DeckWebBrowser
 
 import { afterPatch, Dropdown, findInReactTree, FooterLegendProps, getReactRoot } from "@decky/ui"
-import { FC } from "react"
+import { FC, ReactElement, ReactNode, useState } from "react"
 import { FaDiscord } from "react-icons/fa"
 
-interface MainMenuItemProps extends FooterLegendProps {
+interface MainMenuItemPropsBase {
     route: string
-    label: string
+    label: ReactNode
     onFocus: () => void
+    icon?: ReactElement
     onActivate?: () => void
-    children?: React.ReactNode
 }
 
-const reactTree = getReactRoot(document.getElementById('root') as any);
-let unpatchMethod: any;
+type MainMenuItemProps = MainMenuItemPropsBase & FooterLegendProps;
 
-const _patchMenu = () => {
-    const menuNode = findInReactTree(reactTree, (node) => node?.memoizedProps?.navID == 'MainNavMenuContainer')
+const getReactTree = () => getReactRoot(document.getElementById('root') as any)
+
+export const patchMenu = () => {
+    const menuNode = findInReactTree(getReactTree(), (node: { memoizedProps: { navID: string } }) => node?.memoizedProps?.navID == 'MainNavMenuContainer')
     if (!menuNode || !menuNode.return?.type) {
-        console.log('Menu Patch', 'Failed to find main menu root node.')
+        //namedLogger.log('Failed to find main menu root node.')
         return () => { }
     }
     const orig = menuNode.return.type
@@ -26,40 +27,44 @@ const _patchMenu = () => {
     const menuWrapper = (props: any) => {
         const ret = orig(props)
         if (!ret?.props?.children?.props?.children?.[0]?.type) {
-            console.log('Menu Patch', 'The main menu element could not be found at the expected location. Valve may have changed it.')
+            //namedLogger.log('The main menu element could not be found at the expected location. Valve may have changed it.')
             return ret
         }
         if (patchedInnerMenu) {
             ret.props.children.props.children[0].type = patchedInnerMenu
         } else {
             afterPatch(ret.props.children.props.children[0], 'type', (_: any, ret: any) => {
-                if (!ret?.props?.children || !Array.isArray(ret?.props?.children)) {
-                    console.log('Menu Patch', 'Could not find menu items to patch.');
+                const isMenuItemElt = (e: any) => e.props?.label && e.props.onFocus && e.props.route && e.type?.toString;
+                const menuItems = findInReactTree(ret, (node: any[]) => Array.isArray(node) && node.some(isMenuItemElt)) as Array<any>;
+
+                if (!menuItems) {
+                    //namedLogger.log('Could not find menu items to patch.')
                     return ret
                 }
-                const itemIndexes = getMenuItemIndexes(ret.props.children)
-                const menuItemElement = findInReactTree(ret.props.children, (x) =>
-                    x?.type?.toString()?.includes('exactRouteMatch:'),
-                );
+
+                const itemIndexes = getMenuItemIndexes(menuItems);
+                const menuItem = menuItems.find(isMenuItemElt) as { props: MainMenuItemProps, type: () => ReactElement };
 
                 const newItem =
                     <MenuItemWrapper
-                        route="/discord"
+                        key={'deckcord'}
+                        route={'/discord'}
                         label='Discord'
-                        onFocus={menuItemElement.props.onFocus}
-                        MenuItemComponent={menuItemElement.type}
+                        onFocus={menuItem.props.onFocus}
+                        useIconAsProp={!!menuItem.props.icon}
+                        MenuItemComponent={menuItem.type}
                     />
 
                 const browserPosition = Number.parseInt(localStorage.getItem("DECKCORD_MENU_POSITION") || "3" as string);
 
-                if (browserPosition === 9) ret.props.children.splice(itemIndexes[itemIndexes.length - 1] + 1, 0, newItem)
-                else ret.props.children.splice(itemIndexes[browserPosition - 1], 0, newItem)
+                if (browserPosition === 9) menuItems.splice(itemIndexes[itemIndexes.length - 1] + 1, 0, newItem)
+                else menuItems.splice(itemIndexes[browserPosition - 1], 0, newItem)
 
                 return ret
             })
             patchedInnerMenu = ret.props.children.props.children[0].type
         }
-        return ret;
+        return ret
     }
     menuNode.return.type = menuWrapper
     if (menuNode.return.alternate) {
@@ -77,10 +82,11 @@ function getMenuItemIndexes(items: any[]) {
 }
 
 interface MenuItemWrapperProps extends MainMenuItemProps {
-    MenuItemComponent: FC<MainMenuItemProps>
+    MenuItemComponent: FC<MainMenuItemProps>;
+    useIconAsProp: boolean;
 }
 
-const MenuItemWrapper: FC<MenuItemWrapperProps> = ({ MenuItemComponent, ...props }) => {
+const MenuItemWrapper: FC<MenuItemWrapperProps> = ({ MenuItemComponent, label, useIconAsProp, ...props }) => {
 
     const choosePosition: any = new (Dropdown as any)({
         rgOptions: [
@@ -96,23 +102,19 @@ const MenuItemWrapper: FC<MenuItemWrapperProps> = ({ MenuItemComponent, ...props
         ],
         selectedOption: 1,
         onChange: (data: any) => {
-            unpatchMethod();
             localStorage.setItem("DECKCORD_MENU_POSITION", data.data);
             patchMenu();
         }
     });
+
+    (props as any)[useIconAsProp ? 'icon' : 'children'] = <FaDiscord />;
+
     return (
         <MenuItemComponent
             {...props}
-            onSecondaryActionDescription={ "Change Position" }
-            onSecondaryButton={ (_) => choosePosition.ShowMenu() }
-        >
-            <FaDiscord/>
-        </MenuItemComponent>
+            label={'Discord'}
+            onSecondaryActionDescription={"Change Position"}
+            onSecondaryButton={(_) => choosePosition.ShowMenu()}
+        />
     )
-}
-
-export const patchMenu = () => {
-    unpatchMethod = _patchMenu()
-    return unpatchMethod;
 }

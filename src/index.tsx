@@ -20,7 +20,6 @@ import {
 import { MuteButton } from "./components/buttons/MuteButton";
 import { DeafenButton } from "./components/buttons/DeafenButton";
 import { DisconnectButton } from "./components/buttons/DisconnectButton";
-import { GoLiveButton } from "./components/buttons/GoLiveButton";
 import { PushToTalkButton } from "./components/buttons/PushToTalk";
 import {
   VoiceChatChannel,
@@ -83,7 +82,6 @@ const Content = () => {
             <MuteButton />
             <DeafenButton />
             <DisconnectButton />
-            <GoLiveButton />
           </Focusable>
         </PanelSectionRow>
         <PanelSectionRow>
@@ -228,7 +226,7 @@ export default definePlugin(() => {
       try {
         appLifetimeUnregister();
         settingsChangeUnregister();
-      } catch (error) {}
+      } catch (error) { }
     },
     alwaysRender: true,
   };
