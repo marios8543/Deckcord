@@ -1,11 +1,11 @@
 from json import dumps, loads
 from asyncio import sleep, get_event_loop, Task, Event, Queue
-from aiohttp import WSMsgType
-from aiohttp.web import WebSocketResponse
+from aiohttp import WSMsgType # type: ignore
+from aiohttp.web import WebSocketResponse # type: ignore
 from traceback import print_exception
 
 from .store_access import StoreAccess, User
-from decky_plugin import logger
+from decky import logger # type: ignore
 
 class EventHandler:
     def __init__(self) -> None:

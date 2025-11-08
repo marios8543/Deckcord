@@ -1,16 +1,17 @@
-import { Router, ServerAPI } from "decky-frontend-lib"
-import { VFC, useLayoutEffect } from "react"
+import { call, toaster } from "@decky/api"
+import { Router } from "@decky/ui"
+import { useLayoutEffect } from "react"
 
-export const DiscordTab: VFC<{serverAPI: ServerAPI}> = ({ serverAPI }) => {
+export const DiscordTab = () => {
     useLayoutEffect(() => {
-        serverAPI.callPluginMethod("get_state", {}).then(res => {
-            const state = (res.result as any);
-            if (state?.loaded) {
+        call<[], any>("get_state").then(res => {
+            const state = res;
+            if (state?.loaded && window.DISCORD_TAB) {
                 window.DISCORD_TAB.m_browserView.SetVisible(true);
                 window.DISCORD_TAB.m_browserView.SetFocus(true);
             }
             else {
-                serverAPI.toaster.toast({
+                toaster.toast({
                     title: "Deckcord",
                     body: "Deckcord has not loaded yet!"
                 });
@@ -18,6 +19,9 @@ export const DiscordTab: VFC<{serverAPI: ServerAPI}> = ({ serverAPI }) => {
             }
         })
         return () => {
+            if (!window.DISCORD_TAB)
+                return;
+
             window.DISCORD_TAB.m_browserView.SetVisible(false);
             window.DISCORD_TAB.m_browserView.SetFocus(false);
         }

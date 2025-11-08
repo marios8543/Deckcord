@@ -5,6 +5,12 @@ window.Vencord.Plugins.plugins.Deckcord = {
     required: true,
     startAt: "DOMContentLoaded",
     async start() {
+        window.old_enumerate_devices = navigator.mediaDevices.enumerateDevices
+        navigator.mediaDevices.enumerateDevices = async () => {
+            const devices = await window.old_enumerate_devices();
+            return devices.filter(f => f.label != "Filter Chain Source" && f.label != "Virtual Source" && !(f.label == "" && f.deviceId == "default"))
+        }
+
         navigator.mediaDevices.getUserMedia = (_) => new Promise(async (resolve, reject) => {
             if (window.MIC_STREAM != undefined && window.MIC_PEER_CONNECTION != undefined && window.MIC_PEER_CONNECTION.connectionState == "connected") {
                 console.log("WebRTC stream available. Returning that.");
@@ -64,7 +70,7 @@ window.Vencord.Plugins.plugins.Deckcord = {
         function patchTypingField() {
             const t = setInterval(() => {
                 try {
-                    document.getElementsByClassName("editor__66464")[0].onclick = (e) => fetch("http://127.0.0.1:65123/openkb", { mode: "no-cors" });
+                    document.querySelectorAll("[role=\"textbox\"]")[0].onclick = (e) => fetch("http://127.0.0.1:65123/openkb", { mode: "no-cors" });
                     clearInterval(t);
                 } catch (err) { }
             }, 100)
